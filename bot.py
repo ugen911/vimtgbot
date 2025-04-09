@@ -1,10 +1,15 @@
+import os
 import asyncio
 from aiogram import Bot, Dispatcher, types, F
 from aiogram.enums import ParseMode
 from aiogram.client.default import DefaultBotProperties
 from aiogram.types import ReplyKeyboardMarkup, KeyboardButton
+from dotenv import load_dotenv
 
-TOKEN = "7609102030:AAGYMoxV6z4D6zFS8o5LFFhROuUF8manlCA"
+load_dotenv()
+
+TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
+
 
 bot = Bot(token=TOKEN, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
 dp = Dispatcher()
