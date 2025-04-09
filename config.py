@@ -10,7 +10,7 @@ DATA_DIR = "data"
 MEDIA_DIR = "media"
 
 # ID или username администраторов
-ADMINS = ["Natali_stro", "TUSHC"]
+ADMINS = [643043311, 568181009]
 
 # Названия секций и соответствующие JSON-файлы/папки
 SECTIONS = {
