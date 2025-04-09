@@ -1,6 +1,6 @@
 from aiogram import Router, types, F
 from config import ADMINS
-from keyboards.main_menu import main_menu
+from keyboards.main_menu import main_menu, back_menu
 import re
 from aiogram.types import ReplyKeyboardMarkup, KeyboardButton, ReplyKeyboardRemove
 
@@ -9,7 +9,7 @@ router = Router()
 user_states = {}
 
 skip_keyboard = ReplyKeyboardMarkup(
-    keyboard=[[KeyboardButton(text="Пропустить")]],
+    keyboard=[[KeyboardButton(text="Пропустить")], [KeyboardButton(text="🔙 Назад")]],
     resize_keyboard=True,
     one_time_keyboard=True
 )
@@ -17,7 +17,16 @@ skip_keyboard = ReplyKeyboardMarkup(
 @router.message(F.text == "📋 Запись на экскурсию")
 async def start_excursion_form(message: types.Message):
     user_states[message.from_user.id] = {"step": "phone"}
-    await message.answer("📋 Для записи на экскурсию, пожалуйста, введите номер телефона:")
+    await message.answer("📋 Для записи на экскурсию, пожалуйста, введите номер телефона:", reply_markup=skip_keyboard)
+
+@router.message(F.text.in_(["🔙 Назад", "🏠 Главное меню"]))
+async def cancel_form(message: types.Message):
+    if message.from_user.id in user_states:
+        del user_states[message.from_user.id]
+    if message.text == "🔙 Назад":
+        await message.answer("🔙 Возвращаемся назад:", reply_markup=main_menu)
+    else:
+        await message.answer("🏡 Главное меню:", reply_markup=main_menu)
 
 @router.message()
 async def handle_excursion_form(message: types.Message):
@@ -27,26 +36,34 @@ async def handle_excursion_form(message: types.Message):
     if not state:
         return
 
+    text = message.text.strip()
+
+    # Защита: если пользователь нажал кнопку другого раздела, отменяем форму
+    if text in ["📚 Услуги", "📰 Анонсы", "📋 Запись на экскурсию", "🌐 Онлайн экскурсия", "📆 Расписание занятий", "🧑‍🏫 Педагоги", "🍎 Меню"]:
+        del user_states[uid]
+        return
+
     if state["step"] == "phone":
-        phone = message.text.strip()
-        if not is_valid_phone(phone):
+        if not is_valid_phone(text):
             await message.answer("❌ Неверный номер. Допустимые форматы:\n+7XXXXXXXXXX, 8XXXXXXXXXX или 2XXXXXX")
             return
-        state["phone"] = phone
+        state["phone"] = text
         state["step"] = "name"
         await message.answer("Введите ваше имя (необязательно):", reply_markup=skip_keyboard)
 
     elif state["step"] == "name":
-        name = message.text.strip()
-        state["name"] = name if name.lower() != "пропустить" else "—"
+        state["name"] = text if text.lower() != "пропустить" else "—"
         state["step"] = "comment"
         await message.answer("Оставьте сообщение (необязательно):", reply_markup=skip_keyboard)
 
     elif state["step"] == "comment":
-        comment = message.text.strip()
-        state["comment"] = comment if comment.lower() != "пропустить" else "—"
+        state["comment"] = text if text.lower() != "пропустить" else "—"
         await finish_excursion_form(message, state)
         del user_states[uid]
+
+    else:
+        del user_states[uid]
+        await message.answer("⚠️ Ввод прерван. Попробуйте снова с команды меню.", reply_markup=main_menu)
 
 def is_valid_phone(phone: str) -> bool:
     phone = phone.replace(" ", "")
@@ -69,9 +86,8 @@ async def finish_excursion_form(message: types.Message, data: dict):
 
     await message.answer("✅ Заявка отправлена! Мы скоро с вами свяжемся.", reply_markup=main_menu)
 
-    # Рассылка администраторам
     for admin in ADMINS:
         try:
             await message.bot.send_message(admin, msg)
         except Exception:
-            pass  # игнорируем ошибки, если пользователь не в чате
+            pass
