@@ -1,18 +1,20 @@
-from aiogram import Router
-from . import admin_menu
-from . import services_admin
-from . import announcements_admin
-from . import eat_admin
-from . import schedule_admin
-from . import pedagogues_admin
-from . import online_tour_admin
+from aiogram import Dispatcher
+from . import (
+    admin_menu,
+    services_admin,
+    announcements_admin,
+    eat_admin,
+    schedule_admin,
+    pedagogues_admin,
+    online_tour_admin,
+)
 
-router = Router()
 
-router.include_router(admin_menu.router)
-router.include_router(services_admin.router)
-router.include_router(announcements_admin.router)
-router.include_router(eat_admin.router)
-router.include_router(schedule_admin.router)
-router.include_router(pedagogues_admin.router)
-router.include_router(online_tour_admin.router)
+def register_admin_handlers(dp: Dispatcher):
+    dp.include_router(admin_menu.router)
+    dp.include_router(services_admin.router)
+    dp.include_router(announcements_admin.router)
+    dp.include_router(eat_admin.router)
+    dp.include_router(schedule_admin.router)
+    dp.include_router(pedagogues_admin.router)
+    dp.include_router(online_tour_admin.router)

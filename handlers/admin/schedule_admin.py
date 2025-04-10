@@ -187,7 +187,7 @@ async def start_edit_schedule(message: types.Message, state: FSMContext):
     )
 
 
-@router.message(ManageSchedule.waiting_for_block_selection, F.text.regexp("^\d+:"))
+@router.message(ManageSchedule.waiting_for_block_selection, F.text.regexp(r"^\d+:"))
 async def prepare_edit_block(message: types.Message, state: FSMContext):
     block_idx = int(message.text.split(":")[0]) - 1
     await state.update_data(block_idx=block_idx)
