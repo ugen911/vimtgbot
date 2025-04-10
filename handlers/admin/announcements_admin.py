@@ -4,8 +4,10 @@ from aiogram.fsm.context import FSMContext
 import os
 from config import DATA_DIR, MEDIA_DIR, SECTIONS, ADMINS
 from handlers.admin.base_crud import load_json, save_json, save_media_file
+from filters.is_admin import IsAdmin
 
 router = Router()
+router.message.filter(IsAdmin())
 
 SECTION_TITLE = "📰 Анонсы"
 SECTION_KEY = SECTIONS[SECTION_TITLE]
