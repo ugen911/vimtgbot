@@ -5,6 +5,7 @@ from . import online_tour
 from . import schedule
 from . import excursion
 from . import pedagogues
+from . import eat
 
 
 def register_user_handlers(dp):
@@ -16,3 +17,4 @@ def register_user_handlers(dp):
     dp.include_router(schedule.router)
     dp.include_router(excursion.router)
     dp.include_router(pedagogues.router)
+    dp.include_router(eat.router)
