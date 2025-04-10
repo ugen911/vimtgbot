@@ -7,9 +7,9 @@ main_menu = ReplyKeyboardMarkup(
         [KeyboardButton(text="🌐 Онлайн экскурсия")],
         [KeyboardButton(text="📆 Расписание занятий")],
         [KeyboardButton(text="🧑‍🏫 Педагоги")],
-        [KeyboardButton(text="🍎 Меню")]
+        [KeyboardButton(text="🍎 Меню")],
     ],
-    resize_keyboard=True
+    resize_keyboard=True,
 )
 
 back_menu = ReplyKeyboardMarkup(
