@@ -1,238 +1,170 @@
 from aiogram import Router, F, types
-from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
+from aiogram.fsm.context import FSMContext
 import os
 from config import DATA_DIR, MEDIA_DIR, ADMINS
 from handlers.admin.base_crud import load_json, save_json, save_media_file
 
 router = Router()
 
-JSON_PATH = os.path.join(DATA_DIR, "pedagogues.json")
-MEDIA_PATH = os.path.join(MEDIA_DIR, "педагоги")
+SECTION_KEY = "онлайнэкскурсии"
+JSON_PATH = os.path.join(DATA_DIR, f"{SECTION_KEY}.json")
+MEDIA_PATH = os.path.join(MEDIA_DIR, SECTION_KEY)
 
 
-class EditPedagogue(StatesGroup):
-    waiting_for_role = State()
-    waiting_for_name = State()
-    waiting_for_description = State()
+class AddTour(StatesGroup):
+    waiting_for_desc = State()
     waiting_for_media = State()
 
 
-class ManagePedagogue(StatesGroup):
-    choosing_role = State()
-    choosing_name = State()
-    editing_description = State()
-    editing_media = State()
+class EditTour(StatesGroup):
+    waiting_for_selection = State()
+    waiting_for_desc = State()
+    waiting_for_media = State()
 
 
-@router.message(F.text == "/admin_pedagogues")
-async def admin_pedagogues_menu(message: types.Message):
+class DeleteTour(StatesGroup):
+    waiting_for_selection = State()
+
+
+@router.message(F.text == "/admin_online")
+async def admin_online_menu(message: types.Message):
     if message.from_user.id not in ADMINS:
         return await message.answer("⛔ Доступ запрещен")
 
+    await message.answer(
+        "🌐 Управление онлайн-экскурсиями:",
+        reply_markup=types.ReplyKeyboardMarkup(
+            keyboard=[
+                [types.KeyboardButton(text="➕ Добавить блок")],
+                [
+                    types.KeyboardButton(text="✏️ Изменить блок"),
+                    types.KeyboardButton(text="🗑 Удалить блок"),
+                ],
+                [types.KeyboardButton(text="🔙 В админ-панель")],
+            ],
+            resize_keyboard=True,
+        ),
+    )
+
+
+@router.message(F.text == "🔙 В админ-панель")
+async def back_to_admin_panel(message: types.Message):
+    await message.bot.send_message(message.chat.id, "/admin")
+
+
+@router.message(F.text == "➕ Добавить блок")
+async def start_add_tour(message: types.Message, state: FSMContext):
+    await state.set_state(AddTour.waiting_for_desc)
+    await message.answer("Введите описание блока:")
+
+
+@router.message(AddTour.waiting_for_desc)
+async def get_tour_description(message: types.Message, state: FSMContext):
+    await state.update_data(desc=message.text.strip())
+    await state.set_state(AddTour.waiting_for_media)
+    await message.answer("Отправьте медиафайлы. Когда закончите — напишите 'Готово'")
+
+
+@router.message(AddTour.waiting_for_media, F.text.lower() == "готово")
+async def save_new_tour(message: types.Message, state: FSMContext):
+    data = await state.get_data()
+    desc = data["desc"]
+    media = data.get("media", [])
+    blocks = load_json(JSON_PATH)
+    blocks.append({"desc": desc, "media": media})
+    save_json(JSON_PATH, blocks)
+    await state.clear()
+    await message.answer("✅ Блок добавлен")
+
+
+@router.message(AddTour.waiting_for_media, F.content_type.in_(["photo", "video"]))
+async def collect_tour_media(message: types.Message, state: FSMContext):
+    file_id = message.photo[-1].file_id if message.photo else message.video.file_id
+    is_video = bool(message.video)
+    filename = await save_media_file(message.bot, file_id, MEDIA_PATH, is_video)
+    media = (await state.get_data()).get("media", [])
+    media.append(filename)
+    await state.update_data(media=media)
+    await message.answer("📎 Медиа добавлено. Отправьте ещё или 'Готово'")
+
+
+@router.message(F.text == "🗑 Удалить блок")
+async def start_delete_tour(message: types.Message, state: FSMContext):
+    blocks = load_json(JSON_PATH)
+    if not blocks:
+        return await message.answer("Список пуст")
     keyboard = types.ReplyKeyboardMarkup(
         keyboard=[
-            [
-                types.KeyboardButton(text="👩‍🏫 Воспитатели"),
-                types.KeyboardButton(text="🎓 Преподаватели"),
-            ],
-            [
-                types.KeyboardButton(text="✏️ Редактировать"),
-                types.KeyboardButton(text="🗑 Удалить"),
-            ],
-            [types.KeyboardButton(text="🔙 Назад")],
+            [types.KeyboardButton(text=f"{i+1}: {b['desc'][:30]}")]
+            for i, b in enumerate(blocks)
         ],
         resize_keyboard=True,
     )
-    await message.answer("Выберите действие:", reply_markup=keyboard)
-    await message.bot.get_fsm_context(message.chat.id).set_state(
-        EditPedagogue.waiting_for_role
-    )
+    await state.set_state(DeleteTour.waiting_for_selection)
+    await message.answer("Выберите блок для удаления:", reply_markup=keyboard)
 
 
-@router.message(
-    EditPedagogue.waiting_for_role, F.text.in_(["👩‍🏫 Воспитатели", "🎓 Преподаватели"])
-)
-async def get_pedagogue_name(message: types.Message, state: FSMContext):
-    role_key = "воспитатели" if "Воспитатели" in message.text else "преподаватели"
-    await state.update_data(role=role_key)
-    await state.set_state(EditPedagogue.waiting_for_name)
-    await message.answer("Введите имя педагога:")
-
-
-@router.message(EditPedagogue.waiting_for_name)
-async def get_pedagogue_description(message: types.Message, state: FSMContext):
-    await state.update_data(name=message.text.strip())
-    await state.set_state(EditPedagogue.waiting_for_description)
-    await message.answer("Введите описание педагога:")
-
-
-@router.message(EditPedagogue.waiting_for_description)
-async def get_pedagogue_media(message: types.Message, state: FSMContext):
-    await state.update_data(description=message.text.strip())
-    await state.set_state(EditPedagogue.waiting_for_media)
-    await message.answer(
-        "Отправьте медиафайлы (фото/видео), когда закончите — напишите 'Готово'"
-    )
-
-
-@router.message(EditPedagogue.waiting_for_media, F.content_type.in_(["photo", "video"]))
-async def collect_pedagogue_media(message: types.Message, state: FSMContext):
-    data = await state.get_data()
-    role = data["role"]
-    media_path = os.path.join(MEDIA_PATH, role)
-
-    file_id = message.photo[-1].file_id if message.photo else message.video.file_id
-    is_video = bool(message.video)
-    filename = await save_media_file(
-        message.bot, file_id, media_path, is_video=is_video
-    )
-
-    media_list = data.get("media", [])
-    media_list.append(filename)
-    await state.update_data(media=media_list)
-    await message.answer("📎 Медиа добавлено. Ещё или 'Готово'")
-
-
-@router.message(EditPedagogue.waiting_for_media, F.text.lower() == "готово")
-async def save_pedagogue(message: types.Message, state: FSMContext):
-    data = await state.get_data()
-    role = data["role"]
-    name = data["name"]
-    description = data["description"]
-    media = data.get("media", [])
-
-    all_data = load_json(JSON_PATH)
-    all_data.setdefault(role, []).append(
-        {
-            "name": name,
-            "role": "Воспитатель" if role == "воспитатели" else "Преподаватель",
-            "description": description,
-            "media": media,
-        }
-    )
-    save_json(JSON_PATH, all_data)
-
+@router.message(DeleteTour.waiting_for_selection, F.text.regexp(r"^\d+:"))
+async def delete_selected_tour(message: types.Message, state: FSMContext):
+    idx = int(message.text.split(":")[0]) - 1
+    blocks = load_json(JSON_PATH)
+    if 0 <= idx < len(blocks):
+        del blocks[idx]
+        save_json(JSON_PATH, blocks)
+        await message.answer("🗑 Блок удалён")
     await state.clear()
-    await message.answer("✅ Педагог добавлен")
 
 
-@router.message(F.text == "🗑 Удалить")
-async def delete_pedagogue_start(message: types.Message, state: FSMContext):
-    await state.set_state(ManagePedagogue.choosing_role)
-    await message.answer(
-        "Выберите категорию:",
-        reply_markup=types.ReplyKeyboardMarkup(
-            keyboard=[
-                [
-                    types.KeyboardButton(text="👩‍🏫 Воспитатели"),
-                    types.KeyboardButton(text="🎓 Преподаватели"),
-                ]
-            ],
-            resize_keyboard=True,
-        ),
-    )
-
-
-@router.message(F.text == "✏️ Редактировать")
-async def edit_pedagogue_start(message: types.Message, state: FSMContext):
-    await state.set_state(ManagePedagogue.choosing_role)
-    await message.answer(
-        "Выберите категорию:",
-        reply_markup=types.ReplyKeyboardMarkup(
-            keyboard=[
-                [
-                    types.KeyboardButton(text="👩‍🏫 Воспитатели"),
-                    types.KeyboardButton(text="🎓 Преподаватели"),
-                ]
-            ],
-            resize_keyboard=True,
-        ),
-    )
-
-
-@router.message(
-    ManagePedagogue.choosing_role, F.text.in_(["👩‍🏫 Воспитатели", "🎓 Преподаватели"])
-)
-async def list_pedagogues_by_role(message: types.Message, state: FSMContext):
-    role_key = "воспитатели" if "Воспитатели" in message.text else "преподаватели"
-    data = load_json(JSON_PATH)
-    names = [p["name"] for p in data.get(role_key, [])]
-
-    if not names:
+@router.message(F.text == "✏️ Изменить блок")
+async def start_edit_tour(message: types.Message, state: FSMContext):
+    blocks = load_json(JSON_PATH)
+    if not blocks:
         return await message.answer("Список пуст")
-
-    await state.update_data(role=role_key)
     keyboard = types.ReplyKeyboardMarkup(
-        keyboard=[[types.KeyboardButton(text=name)] for name in names],
+        keyboard=[
+            [types.KeyboardButton(text=f"{i+1}: {b['desc'][:30]}")]
+            for i, b in enumerate(blocks)
+        ],
         resize_keyboard=True,
     )
-    await state.set_state(ManagePedagogue.choosing_name)
-    await message.answer("Выберите имя:", reply_markup=keyboard)
+    await state.set_state(EditTour.waiting_for_selection)
+    await message.answer("Выберите блок для редактирования:", reply_markup=keyboard)
 
 
-@router.message(ManagePedagogue.choosing_name)
-async def confirm_edit_or_delete(message: types.Message, state: FSMContext):
-    data = await state.get_data()
-    role = data["role"]
-    name = message.text.strip()
-    all_data = load_json(JSON_PATH)
-    index = next((i for i, p in enumerate(all_data[role]) if p["name"] == name), -1)
-
-    if index == -1:
-        return await message.answer("❌ Не найдено")
-
-    await state.update_data(name=name, index=index)
-    if state.state == ManagePedagogue.choosing_name:
-        await state.set_state(ManagePedagogue.editing_description)
-        await message.answer("Введите новое описание:")
+@router.message(EditTour.waiting_for_selection, F.text.regexp(r"^\d+:"))
+async def edit_tour_desc(message: types.Message, state: FSMContext):
+    idx = int(message.text.split(":")[0]) - 1
+    await state.update_data(index=idx)
+    await state.set_state(EditTour.waiting_for_desc)
+    await message.answer("Введите новое описание:")
 
 
-@router.message(ManagePedagogue.editing_description)
-async def edit_description(message: types.Message, state: FSMContext):
-    await state.update_data(description=message.text.strip())
-    await state.set_state(ManagePedagogue.editing_media)
+@router.message(EditTour.waiting_for_desc)
+async def edit_tour_media_prompt(message: types.Message, state: FSMContext):
+    await state.update_data(desc=message.text.strip())
+    await state.set_state(EditTour.waiting_for_media)
     await message.answer("Отправьте новые медиа или 'Готово'")
 
 
-@router.message(ManagePedagogue.editing_media, F.content_type.in_(["photo", "video"]))
-async def collect_edit_media(message: types.Message, state: FSMContext):
+@router.message(EditTour.waiting_for_media, F.content_type.in_(["photo", "video"]))
+async def collect_edit_tour_media(message: types.Message, state: FSMContext):
     file_id = message.photo[-1].file_id if message.photo else message.video.file_id
     is_video = bool(message.video)
+    filename = await save_media_file(message.bot, file_id, MEDIA_PATH, is_video)
+    media = (await state.get_data()).get("media", [])
+    media.append(filename)
+    await state.update_data(media=media)
+    await message.answer("📎 Медиа добавлено. Отправьте ещё или 'Готово'")
+
+
+@router.message(EditTour.waiting_for_media, F.text.lower() == "готово")
+async def save_edited_tour(message: types.Message, state: FSMContext):
     data = await state.get_data()
-    media_path = os.path.join(MEDIA_PATH, data["role"])
-    filename = await save_media_file(
-        message.bot, file_id, media_path, is_video=is_video
-    )
-
-    media_list = data.get("media", [])
-    media_list.append(filename)
-    await state.update_data(media=media_list)
-    await message.answer("📎 Медиа добавлено. Ещё или 'Готово'")
-
-
-@router.message(ManagePedagogue.editing_media, F.text.lower() == "готово")
-async def finish_editing(message: types.Message, state: FSMContext):
-    data = await state.get_data()
-    all_data = load_json(JSON_PATH)
-
-    role = data["role"]
     idx = data["index"]
-    all_data[role][idx]["description"] = data["description"]
-    all_data[role]["media"] = data.get("media", [])
-
-    save_json(JSON_PATH, all_data)
-    await message.answer("✏️ Обновлено")
-    await state.clear()
-
-
-@router.message(ManagePedagogue.editing_description, F.text.lower() == "удалить")
-async def finish_delete(message: types.Message, state: FSMContext):
-    data = await state.get_data()
-    all_data = load_json(JSON_PATH)
-    role = data["role"]
-    idx = data["index"]
-    del all_data[role][idx]
-    save_json(JSON_PATH, all_data)
-    await message.answer("🗑 Удалено")
+    blocks = load_json(JSON_PATH)
+    if 0 <= idx < len(blocks):
+        blocks[idx] = {"desc": data["desc"], "media": data.get("media", [])}
+        save_json(JSON_PATH, blocks)
+        await message.answer("✏️ Блок обновлён")
     await state.clear()
