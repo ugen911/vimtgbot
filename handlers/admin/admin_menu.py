@@ -64,3 +64,4 @@ async def admin_pedagogues_redirect(message: types.Message):
 async def admin_online_tour_redirect(message: types.Message):
     await message.answer("Открываю онлайн-экскурсию...")
     await message.bot.send_message(message.chat.id, "/admin_online")
+
