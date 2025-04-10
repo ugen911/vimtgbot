@@ -3,10 +3,10 @@ from config import ADMINS
 from keyboards.main_menu import main_menu, back_menu
 import re
 from aiogram.types import ReplyKeyboardMarkup, KeyboardButton
+from handlers.user.state import user_states
 
 router = Router()
 
-user_states = {}
 
 # Используется только на шагах "имя" и "комментарий"
 skip_keyboard = ReplyKeyboardMarkup(

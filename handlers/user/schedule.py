@@ -3,7 +3,7 @@ import json
 from aiogram import Router, types, F
 from config import DATA_DIR, MEDIA_DIR, SECTIONS
 from keyboards.main_menu import back_menu
-from handlers.user.excursion import user_states
+from handlers.user.state import user_states
 
 router = Router()
 
