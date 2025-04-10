@@ -16,8 +16,10 @@ load_dotenv()
 bot = Bot(token=TOKEN, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
 dp = Dispatcher()
 
-register_user_handlers(dp)
+
 register_admin_handlers(dp)
+register_user_handlers(dp)
+
 
 async def main():
     print("🤖 Бот запущен")
