@@ -2,6 +2,8 @@ from aiogram import Router, F, types
 from config import ADMINS
 from utils.admin_mode import enable_admin, disable_admin
 from filters.admin_mode_filter import AdminModeFilter
+from aiogram.fsm.context import FSMContext
+
 
 router = Router()
 
@@ -85,3 +87,9 @@ async def admin_pedagogues_redirect(message: types.Message):
 async def admin_online_tour_redirect(message: types.Message):
     await message.answer("Открываю онлайн-экскурсию...")
     await message.bot.send_message(message.chat.id, "/admin_online")
+
+
+@router.message(AdminModeFilter(), F.text == "🔙 Назад")
+async def back_to_admin_main(message: types.Message, state: FSMContext):
+    await state.clear()
+    await show_admin_menu(message)

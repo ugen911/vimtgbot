@@ -13,9 +13,5 @@ main_menu = ReplyKeyboardMarkup(
 )
 
 back_menu = ReplyKeyboardMarkup(
-    keyboard=[
-        [KeyboardButton(text="🔙 Назад")],
-        [KeyboardButton(text="🏠 Главное меню")]
-    ],
-    resize_keyboard=True
+    keyboard=[[KeyboardButton(text="🔙 Назад")]], resize_keyboard=True
 )

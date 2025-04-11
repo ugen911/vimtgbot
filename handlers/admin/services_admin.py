@@ -205,9 +205,3 @@ async def collect_new_media(message: types.Message, state: FSMContext):
     all_media = state_data.get("media", []) + media_list
     await state.update_data(media=all_media)
     await message.answer("📎 Медиа добавлено. Отправьте ещё или напишите 'Готово'")
-
-
-@router.message(F.text == "🔙 Назад")
-async def back_to_admin_menu(message: types.Message, state: FSMContext):
-    await state.clear()
-    await admin_services_menu(message)
