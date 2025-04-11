@@ -5,7 +5,7 @@ import os
 from config import DATA_DIR, MEDIA_DIR, ADMINS
 from handlers.admin.base_crud import load_json, save_json, save_media_file
 from filters.is_admin import IsAdmin
-from keyboards.main_menu import back_menu, action_menu  # ✅ добавлено меню действий
+from keyboards.main_menu import back_menu, action_menu
 
 router = Router()
 router.message.filter(IsAdmin())
@@ -33,6 +33,7 @@ async def schedule_admin_menu(message: types.Message, state: FSMContext):
     if message.from_user.id not in ADMINS:
         return await message.answer("⛔ Доступ запрещен")
 
+    await state.clear()
     group_keyboard = types.ReplyKeyboardMarkup(
         keyboard=[
             [
@@ -62,6 +63,8 @@ async def schedule_group_selected(message: types.Message, state: FSMContext):
 
 @router.message(ManageSchedule.choosing_action, F.text == "➕ Добавить")
 async def start_adding_schedule(message: types.Message, state: FSMContext):
+    if await state.get_state() != ManageSchedule.choosing_action.state:
+        return
     await state.set_state(EditSchedule.entering_desc)
     await message.answer("Введите описание блока:", reply_markup=back_menu)
 
@@ -104,6 +107,9 @@ async def finish_add_schedule(message: types.Message, state: FSMContext):
 
 @router.message(ManageSchedule.choosing_action, F.text.in_(["✏️ Изменить", "🗑 Удалить"]))
 async def choose_block_to_edit_or_delete(message: types.Message, state: FSMContext):
+    if await state.get_state() != ManageSchedule.choosing_action.state:
+        return
+
     data = await state.get_data()
     group = data["group"]
     action = message.text

@@ -5,7 +5,7 @@ import os
 from config import DATA_DIR, MEDIA_DIR, SECTIONS, ADMINS
 from handlers.admin.base_crud import load_json, save_json, save_media_file
 from filters.is_admin import IsAdmin
-from keyboards.main_menu import back_menu, action_menu  # ✅ Добавили универсальные меню
+from keyboards.main_menu import back_menu, action_menu
 
 router = Router()
 router.message.filter(IsAdmin())
@@ -33,15 +33,17 @@ class EditService(StatesGroup):
 
 
 @router.message(F.text == "/admin_services")
-async def admin_services_menu(message: types.Message):
+async def admin_services_menu(message: types.Message, state: FSMContext):
     if message.from_user.id not in ADMINS:
         return await message.answer("⛔ Доступ запрещен")
-
+    await state.clear()
     await message.answer("🔧 Управление услугами:", reply_markup=action_menu)
 
 
 @router.message(F.text == "➕ Добавить")
 async def start_add_service(message: types.Message, state: FSMContext):
+    if await state.get_state() is not None:
+        return
     await state.set_state(AddService.waiting_for_title)
     await message.answer("Введите заголовок новой услуги:", reply_markup=back_menu)
 
@@ -63,6 +65,19 @@ async def process_service_desc(message: types.Message, state: FSMContext):
     )
 
 
+@router.message(AddService.waiting_for_media, F.content_type.in_(["photo", "video"]))
+async def collect_service_media(message: types.Message, state: FSMContext):
+    file_id = message.photo[-1].file_id if message.photo else message.video.file_id
+    is_video = bool(message.video)
+    filename = await save_media_file(
+        message.bot, file_id, MEDIA_PATH, is_video=is_video
+    )
+    state_data = await state.get_data()
+    all_media = state_data.get("media", []) + [filename]
+    await state.update_data(media=all_media)
+    await message.answer("📎 Медиа добавлено. Отправьте ещё или напишите 'Готово'")
+
+
 @router.message(AddService.waiting_for_media, F.text.lower() == "готово")
 async def finish_add_service(message: types.Message, state: FSMContext):
     data = await state.get_data()
@@ -78,21 +93,10 @@ async def finish_add_service(message: types.Message, state: FSMContext):
     await message.answer("✅ Услуга добавлена", reply_markup=action_menu)
 
 
-@router.message(AddService.waiting_for_media, F.content_type.in_(["photo", "video"]))
-async def collect_service_media(message: types.Message, state: FSMContext):
-    file_id = message.photo[-1].file_id if message.photo else message.video.file_id
-    is_video = bool(message.video)
-    filename = await save_media_file(
-        message.bot, file_id, MEDIA_PATH, is_video=is_video
-    )
-    state_data = await state.get_data()
-    all_media = state_data.get("media", []) + [filename]
-    await state.update_data(media=all_media)
-    await message.answer("📎 Медиа добавлено. Отправьте ещё или напишите 'Готово'")
-
-
 @router.message(F.text == "🗑 Удалить")
 async def start_delete_service(message: types.Message, state: FSMContext):
+    if await state.get_state() is not None:
+        return
     services = load_json(JSON_PATH)
     if not services:
         return await message.answer("Список услуг пуст.", reply_markup=action_menu)
@@ -121,6 +125,8 @@ async def process_delete_selection(message: types.Message, state: FSMContext):
 
 @router.message(F.text == "✏️ Изменить")
 async def start_edit_service(message: types.Message, state: FSMContext):
+    if await state.get_state() is not None:
+        return
     services = load_json(JSON_PATH)
     if not services:
         return await message.answer("Список услуг пуст.", reply_markup=action_menu)
@@ -150,21 +156,6 @@ async def ask_new_media(message: types.Message, state: FSMContext):
     )
 
 
-@router.message(EditService.waiting_for_new_media, F.text.lower() == "готово")
-async def save_edited_service(message: types.Message, state: FSMContext):
-    data = await state.get_data()
-    services = load_json(JSON_PATH)
-    for svc in services:
-        if svc["title"] == data["title"]:
-            svc["desc"] = data["desc"]
-            svc["media"] = data.get("media", [])
-            break
-
-    save_json(JSON_PATH, services)
-    await state.clear()
-    await message.answer("✏️ Услуга обновлена.", reply_markup=action_menu)
-
-
 @router.message(
     EditService.waiting_for_new_media, F.content_type.in_(["photo", "video"])
 )
@@ -178,3 +169,18 @@ async def collect_new_media(message: types.Message, state: FSMContext):
     all_media = state_data.get("media", []) + [filename]
     await state.update_data(media=all_media)
     await message.answer("📎 Медиа добавлено. Отправьте ещё или напишите 'Готово'")
+
+
+@router.message(EditService.waiting_for_new_media, F.text.lower() == "готово")
+async def save_edited_service(message: types.Message, state: FSMContext):
+    data = await state.get_data()
+    services = load_json(JSON_PATH)
+    for svc in services:
+        if svc["title"] == data["title"]:
+            svc["desc"] = data["desc"]
+            svc["media"] = data.get("media", [])
+            break
+
+    save_json(JSON_PATH, services)
+    await state.clear()
+    await message.answer("✏️ Услуга обновлена.", reply_markup=action_menu)

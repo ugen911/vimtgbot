@@ -5,10 +5,7 @@ import os
 from config import DATA_DIR, MEDIA_DIR, ADMINS
 from handlers.admin.base_crud import load_json, save_json, save_media_file
 from filters.is_admin import IsAdmin
-from keyboards.main_menu import (
-    back_menu,
-    action_menu,
-)  # ✅ добавим универсальное меню действий
+from keyboards.main_menu import back_menu, action_menu
 
 router = Router()
 router.message.filter(IsAdmin())
@@ -37,6 +34,7 @@ async def admin_pedagogues_menu(message: types.Message, state: FSMContext):
     if message.from_user.id not in ADMINS:
         return await message.answer("⛔ Доступ запрещен")
 
+    await state.clear()
     keyboard = types.ReplyKeyboardMarkup(
         keyboard=[
             [
@@ -65,6 +63,8 @@ async def ask_action_for_role(message: types.Message, state: FSMContext):
 
 @router.message(ManagePedagogue.choosing_action, F.text == "➕ Добавить")
 async def start_add_pedagogue(message: types.Message, state: FSMContext):
+    if await state.get_state() != ManagePedagogue.choosing_action.state:
+        return
     await state.set_state(EditPedagogue.waiting_for_name)
     await message.answer("Введите имя педагога:", reply_markup=back_menu)
 
@@ -90,7 +90,6 @@ async def collect_new_pedagogue_media(message: types.Message, state: FSMContext)
     data = await state.get_data()
     role = data["role"]
     media_path = os.path.join(MEDIA_PATH, role)
-
     file_id = message.photo[-1].file_id if message.photo else message.video.file_id
     is_video = bool(message.video)
     filename = await save_media_file(
@@ -126,10 +125,12 @@ async def finish_add_pedagogue(message: types.Message, state: FSMContext):
 async def choose_pedagogue_for_edit_or_delete(
     message: types.Message, state: FSMContext
 ):
+    if await state.get_state() != ManagePedagogue.choosing_action.state:
+        return
+
     action = message.text
     data = await state.get_data()
     role = data["role"]
-    data["action"] = action
     await state.update_data(action=action)
 
     all_data = load_json(JSON_PATH)

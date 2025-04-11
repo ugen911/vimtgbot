@@ -5,7 +5,7 @@ import os
 from config import DATA_DIR, MEDIA_DIR, SECTIONS, ADMINS
 from handlers.admin.base_crud import load_json, save_json, save_media_file
 from filters.is_admin import IsAdmin
-from keyboards.main_menu import back_menu, action_menu  # ✅ добавили универсальные меню
+from keyboards.main_menu import back_menu, action_menu
 
 router = Router()
 router.message.filter(IsAdmin())
@@ -41,6 +41,9 @@ async def admin_announcements_menu(message: types.Message, state: FSMContext):
 
 @router.message(F.text == "➕ Добавить")
 async def start_add_announcement(message: types.Message, state: FSMContext):
+    current = await state.get_state()
+    if current not in [None]:
+        return
     await state.set_state(AddAnnouncement.waiting_for_title)
     await message.answer("Введите заголовок анонса:")
 
@@ -90,6 +93,9 @@ async def collect_announcement_media(message: types.Message, state: FSMContext):
 
 @router.message(F.text == "🗑 Удалить")
 async def start_delete_announcement(message: types.Message, state: FSMContext):
+    current = await state.get_state()
+    if current not in [None]:
+        return
     items = load_json(JSON_PATH)
     if not items:
         return await message.answer("Список анонсов пуст.", reply_markup=action_menu)
@@ -117,6 +123,9 @@ async def process_delete_announcement(message: types.Message, state: FSMContext)
 
 @router.message(F.text == "✏️ Изменить")
 async def start_edit_announcement(message: types.Message, state: FSMContext):
+    current = await state.get_state()
+    if current not in [None]:
+        return
     items = load_json(JSON_PATH)
     if not items:
         return await message.answer("Список анонсов пуст.", reply_markup=action_menu)

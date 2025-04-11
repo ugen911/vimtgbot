@@ -5,7 +5,7 @@ import os
 from config import DATA_DIR, MEDIA_DIR, ADMINS
 from handlers.admin.base_crud import load_json, save_json, save_media_file
 from filters.is_admin import IsAdmin
-from keyboards.main_menu import back_menu, action_menu  # ✅ добавили action_menu
+from keyboards.main_menu import back_menu, action_menu
 
 router = Router()
 router.message.filter(IsAdmin())
@@ -31,15 +31,18 @@ class DeleteTour(StatesGroup):
 
 
 @router.message(F.text == "/admin_online")
-async def admin_online_menu(message: types.Message):
+async def admin_online_menu(message: types.Message, state: FSMContext):
     if message.from_user.id not in ADMINS:
         return await message.answer("⛔ Доступ запрещен")
-
+    await state.clear()
     await message.answer("🌐 Управление онлайн-экскурсиями:", reply_markup=action_menu)
 
 
 @router.message(F.text == "➕ Добавить")
 async def start_add_tour(message: types.Message, state: FSMContext):
+    current = await state.get_state()
+    if current not in [None]:
+        return
     await state.set_state(AddTour.waiting_for_desc)
     await message.answer("Введите описание блока:", reply_markup=back_menu)
 
@@ -54,6 +57,17 @@ async def get_tour_description(message: types.Message, state: FSMContext):
     )
 
 
+@router.message(AddTour.waiting_for_media, F.content_type.in_(["photo", "video"]))
+async def collect_tour_media(message: types.Message, state: FSMContext):
+    file_id = message.photo[-1].file_id if message.photo else message.video.file_id
+    is_video = bool(message.video)
+    filename = await save_media_file(message.bot, file_id, MEDIA_PATH, is_video)
+    media = (await state.get_data()).get("media", [])
+    media.append(filename)
+    await state.update_data(media=media)
+    await message.answer("📎 Медиа добавлено. Отправьте ещё или 'Готово'")
+
+
 @router.message(AddTour.waiting_for_media, F.text.lower() == "готово")
 async def save_new_tour(message: types.Message, state: FSMContext):
     data = await state.get_data()
@@ -66,19 +80,11 @@ async def save_new_tour(message: types.Message, state: FSMContext):
     await message.answer("✅ Блок добавлен", reply_markup=action_menu)
 
 
-@router.message(AddTour.waiting_for_media, F.content_type.in_(["photo", "video"]))
-async def collect_tour_media(message: types.Message, state: FSMContext):
-    file_id = message.photo[-1].file_id if message.photo else message.video.file_id
-    is_video = bool(message.video)
-    filename = await save_media_file(message.bot, file_id, MEDIA_PATH, is_video)
-    media = (await state.get_data()).get("media", [])
-    media.append(filename)
-    await state.update_data(media=media)
-    await message.answer("📎 Медиа добавлено. Отправьте ещё или 'Готово'")
-
-
 @router.message(F.text == "🗑 Удалить")
 async def start_delete_tour(message: types.Message, state: FSMContext):
+    current = await state.get_state()
+    if current not in [None]:
+        return
     blocks = load_json(JSON_PATH)
     if not blocks:
         return await message.answer("Список пуст", reply_markup=action_menu)
@@ -108,6 +114,9 @@ async def delete_selected_tour(message: types.Message, state: FSMContext):
 
 @router.message(F.text == "✏️ Изменить")
 async def start_edit_tour(message: types.Message, state: FSMContext):
+    current = await state.get_state()
+    if current not in [None]:
+        return
     blocks = load_json(JSON_PATH)
     if not blocks:
         return await message.answer("Список пуст", reply_markup=action_menu)
