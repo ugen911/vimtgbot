@@ -27,3 +27,13 @@ admin_main_menu = ReplyKeyboardMarkup(
     ],
     resize_keyboard=True,
 )
+
+action_menu = ReplyKeyboardMarkup(
+    keyboard=[
+        [KeyboardButton(text="➕ Добавить")],
+        [KeyboardButton(text="✏️ Изменить")],
+        [KeyboardButton(text="🗑 Удалить")],
+        [KeyboardButton(text="🔙 Назад")],
+    ],
+    resize_keyboard=True,
+)

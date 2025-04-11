@@ -5,7 +5,7 @@ import os
 from config import DATA_DIR, MEDIA_DIR, ADMINS
 from handlers.admin.base_crud import load_json, save_json, save_media_file
 from filters.is_admin import IsAdmin
-from keyboards.main_menu import back_menu  # ✅ универсальное назад
+from keyboards.main_menu import back_menu, action_menu  # ✅ добавили action_menu
 
 router = Router()
 router.message.filter(IsAdmin())
@@ -35,23 +35,10 @@ async def admin_online_menu(message: types.Message):
     if message.from_user.id not in ADMINS:
         return await message.answer("⛔ Доступ запрещен")
 
-    await message.answer(
-        "🌐 Управление онлайн-экскурсиями:",
-        reply_markup=types.ReplyKeyboardMarkup(
-            keyboard=[
-                [types.KeyboardButton(text="➕ Добавить блок")],
-                [
-                    types.KeyboardButton(text="✏️ Изменить блок"),
-                    types.KeyboardButton(text="🗑 Удалить блок"),
-                ],
-                [types.KeyboardButton(text="🔙 Назад")],  # ✅ заменили "В админ-панель"
-            ],
-            resize_keyboard=True,
-        ),
-    )
+    await message.answer("🌐 Управление онлайн-экскурсиями:", reply_markup=action_menu)
 
 
-@router.message(F.text == "➕ Добавить блок")
+@router.message(F.text == "➕ Добавить")
 async def start_add_tour(message: types.Message, state: FSMContext):
     await state.set_state(AddTour.waiting_for_desc)
     await message.answer("Введите описание блока:", reply_markup=back_menu)
@@ -76,7 +63,7 @@ async def save_new_tour(message: types.Message, state: FSMContext):
     blocks.append({"desc": desc, "media": media})
     save_json(JSON_PATH, blocks)
     await state.clear()
-    await message.answer("✅ Блок добавлен", reply_markup=back_menu)
+    await message.answer("✅ Блок добавлен", reply_markup=action_menu)
 
 
 @router.message(AddTour.waiting_for_media, F.content_type.in_(["photo", "video"]))
@@ -90,11 +77,11 @@ async def collect_tour_media(message: types.Message, state: FSMContext):
     await message.answer("📎 Медиа добавлено. Отправьте ещё или 'Готово'")
 
 
-@router.message(F.text == "🗑 Удалить блок")
+@router.message(F.text == "🗑 Удалить")
 async def start_delete_tour(message: types.Message, state: FSMContext):
     blocks = load_json(JSON_PATH)
     if not blocks:
-        return await message.answer("Список пуст", reply_markup=back_menu)
+        return await message.answer("Список пуст", reply_markup=action_menu)
 
     keyboard = types.ReplyKeyboardMarkup(
         keyboard=[
@@ -115,15 +102,15 @@ async def delete_selected_tour(message: types.Message, state: FSMContext):
     if 0 <= idx < len(blocks):
         del blocks[idx]
         save_json(JSON_PATH, blocks)
-        await message.answer("🗑 Блок удалён", reply_markup=back_menu)
+        await message.answer("🗑 Блок удалён", reply_markup=action_menu)
     await state.clear()
 
 
-@router.message(F.text == "✏️ Изменить блок")
+@router.message(F.text == "✏️ Изменить")
 async def start_edit_tour(message: types.Message, state: FSMContext):
     blocks = load_json(JSON_PATH)
     if not blocks:
-        return await message.answer("Список пуст", reply_markup=back_menu)
+        return await message.answer("Список пуст", reply_markup=action_menu)
 
     keyboard = types.ReplyKeyboardMarkup(
         keyboard=[
@@ -171,5 +158,5 @@ async def save_edited_tour(message: types.Message, state: FSMContext):
     if 0 <= idx < len(blocks):
         blocks[idx] = {"desc": data["desc"], "media": data.get("media", [])}
         save_json(JSON_PATH, blocks)
-        await message.answer("✏️ Блок обновлён", reply_markup=back_menu)
+        await message.answer("✏️ Блок обновлён", reply_markup=action_menu)
     await state.clear()
