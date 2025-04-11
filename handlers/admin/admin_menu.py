@@ -1,9 +1,9 @@
 from aiogram import Router, F, types
+from aiogram.fsm.context import FSMContext
 from config import ADMINS
 from utils.admin_mode import enable_admin, disable_admin
 from filters.admin_mode_filter import AdminModeFilter
-from aiogram.fsm.context import FSMContext
-
+from keyboards.main_menu import admin_main_menu  # ✅ импорт единого меню
 
 router = Router()
 
@@ -25,70 +25,49 @@ async def exit_admin_mode(message: types.Message):
     await message.answer("👤 Режим администратора отключён")
 
 
-# Главное меню (показывается одинаково для всех)
+# Главное меню администратора
 async def show_admin_menu(message: types.Message):
-    keyboard = types.ReplyKeyboardMarkup(
-        keyboard=[
-            [
-                types.KeyboardButton(text="📚 Услуги"),
-                types.KeyboardButton(text="📰 Анонсы"),
-            ],
-            [
-                types.KeyboardButton(text="🍎 Меню"),
-                types.KeyboardButton(text="📅 Расписание"),
-            ],
-            [
-                types.KeyboardButton(text="🧑‍🏫 Педагоги"),
-                types.KeyboardButton(text="🌐 Онлайн экскурсия"),
-            ],
-        ],
-        resize_keyboard=True,
-    )
-    await message.answer("🏡 Главное меню:", reply_markup=keyboard)
+    await message.answer("🏡 Главное меню:", reply_markup=admin_main_menu)
 
 
-# Услуги
+# Навигация по разделам
 @router.message(AdminModeFilter(), F.text == "📚 Услуги")
 async def admin_services_redirect(message: types.Message):
     await message.answer("Открываю управление услугами...")
     await message.bot.send_message(message.chat.id, "/admin_services")
 
 
-# Анонсы
 @router.message(AdminModeFilter(), F.text == "📰 Анонсы")
 async def admin_announcements_redirect(message: types.Message):
     await message.answer("Открываю управление анонсами...")
     await message.bot.send_message(message.chat.id, "/admin_announcements")
 
 
-# Меню
 @router.message(AdminModeFilter(), F.text == "🍎 Меню")
 async def admin_menu_redirect(message: types.Message):
     await message.answer("Открываю меню питания...")
     await message.bot.send_message(message.chat.id, "/admin_menu")
 
 
-# Расписание
 @router.message(AdminModeFilter(), F.text == "📅 Расписание")
 async def admin_schedule_redirect(message: types.Message):
     await message.answer("Открываю расписание...")
     await message.bot.send_message(message.chat.id, "/admin_schedule")
 
 
-# Педагоги
 @router.message(AdminModeFilter(), F.text == "🧑‍🏫 Педагоги")
 async def admin_pedagogues_redirect(message: types.Message):
     await message.answer("Открываю педагогов...")
     await message.bot.send_message(message.chat.id, "/admin_pedagogues")
 
 
-# Онлайн-экскурсия
 @router.message(AdminModeFilter(), F.text == "🌐 Онлайн экскурсия")
 async def admin_online_tour_redirect(message: types.Message):
     await message.answer("Открываю онлайн-экскурсию...")
     await message.bot.send_message(message.chat.id, "/admin_online")
 
 
+# Универсальная кнопка "Назад" в админке
 @router.message(AdminModeFilter(), F.text == "🔙 Назад")
 async def back_to_admin_main(message: types.Message, state: FSMContext):
     await state.clear()

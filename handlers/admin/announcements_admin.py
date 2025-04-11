@@ -5,6 +5,7 @@ import os
 from config import DATA_DIR, MEDIA_DIR, SECTIONS, ADMINS
 from handlers.admin.base_crud import load_json, save_json, save_media_file
 from filters.is_admin import IsAdmin
+from keyboards.main_menu import back_menu  # ✅ единое меню Назад
 
 router = Router()
 router.message.filter(IsAdmin())
@@ -36,18 +37,17 @@ async def admin_announcements_menu(message: types.Message):
     if message.from_user.id not in ADMINS:
         return await message.answer("⛔ Доступ запрещен")
 
-    await message.answer(
-        "📢 Управление анонсами:",
-        reply_markup=types.ReplyKeyboardMarkup(
-            keyboard=[
-                [types.KeyboardButton(text="➕ Добавить анонс")],
-                [types.KeyboardButton(text="🗑 Удалить анонс")],
-                [types.KeyboardButton(text="✏️ Изменить анонс")],
-                [types.KeyboardButton(text="🔙 Назад")],
-            ],
-            resize_keyboard=True,
-        ),
+    keyboard = types.ReplyKeyboardMarkup(
+        keyboard=[
+            [types.KeyboardButton(text="➕ Добавить анонс")],
+            [types.KeyboardButton(text="🗑 Удалить анонс")],
+            [types.KeyboardButton(text="✏️ Изменить анонс")],
+            [types.KeyboardButton(text="🔙 Назад")],
+        ],
+        resize_keyboard=True,
     )
+
+    await message.answer("📢 Управление анонсами:", reply_markup=keyboard)
 
 
 @router.message(F.text == "➕ Добавить анонс")
@@ -68,46 +68,37 @@ async def process_announcement_desc(message: types.Message, state: FSMContext):
     await state.update_data(desc=message.text.strip())
     await state.set_state(AddAnnouncement.waiting_for_media)
     await message.answer(
-        "Отправьте медиафайлы (фото/видео). Когда закончите — напишите 'Готово'"
+        "Отправьте медиафайлы (фото/видео). Когда закончите — напишите 'Готово'",
+        reply_markup=back_menu,
     )
 
 
 @router.message(AddAnnouncement.waiting_for_media, F.text.lower() == "готово")
 async def finish_add_announcement(message: types.Message, state: FSMContext):
     data = await state.get_data()
-    title = data["title"]
-    desc = data["desc"]
-    media = data.get("media", [])
-
     items = load_json(JSON_PATH)
-    items.append({"title": title, "desc": desc, "media": media})
+    items.append(
+        {"title": data["title"], "desc": data["desc"], "media": data.get("media", [])}
+    )
     save_json(JSON_PATH, items)
 
     await state.clear()
-    await message.answer("✅ Анонс добавлен")
+    await message.answer("✅ Анонс добавлен", reply_markup=back_menu)
 
 
 @router.message(
     AddAnnouncement.waiting_for_media, F.content_type.in_(["photo", "video"])
 )
 async def collect_announcement_media(message: types.Message, state: FSMContext):
-    media_list = []
-    if message.photo:
-        file_id = message.photo[-1].file_id
-        filename = await save_media_file(
-            message.bot, file_id, MEDIA_PATH, is_video=False
-        )
-        media_list.append(filename)
-    elif message.video:
-        file_id = message.video.file_id
-        filename = await save_media_file(
-            message.bot, file_id, MEDIA_PATH, is_video=True
-        )
-        media_list.append(filename)
+    file_id = message.photo[-1].file_id if message.photo else message.video.file_id
+    is_video = bool(message.video)
+    filename = await save_media_file(message.bot, file_id, MEDIA_PATH, is_video)
 
-    state_data = await state.get_data()
-    all_media = state_data.get("media", []) + media_list
-    await state.update_data(media=all_media)
+    data = await state.get_data()
+    media_list = data.get("media", [])
+    media_list.append(filename)
+    await state.update_data(media=media_list)
+
     await message.answer("📎 Медиа добавлено. Отправьте ещё или напишите 'Готово'")
 
 
@@ -115,7 +106,7 @@ async def collect_announcement_media(message: types.Message, state: FSMContext):
 async def start_delete_announcement(message: types.Message, state: FSMContext):
     items = load_json(JSON_PATH)
     if not items:
-        return await message.answer("Список анонсов пуст.")
+        return await message.answer("Список анонсов пуст.", reply_markup=back_menu)
 
     keyboard = types.ReplyKeyboardMarkup(
         keyboard=[[types.KeyboardButton(text=item["title"])] for item in items]
@@ -130,21 +121,21 @@ async def start_delete_announcement(message: types.Message, state: FSMContext):
 async def process_delete_announcement(message: types.Message, state: FSMContext):
     title_to_delete = message.text.strip()
     items = load_json(JSON_PATH)
-
     new_items = [item for item in items if item["title"] != title_to_delete]
+
     if len(new_items) == len(items):
-        return await message.answer("❌ Анонс не найден.")
+        return await message.answer("❌ Анонс не найден.", reply_markup=back_menu)
 
     save_json(JSON_PATH, new_items)
     await state.clear()
-    await message.answer("🗑 Анонс удалён.")
+    await message.answer("🗑 Анонс удалён", reply_markup=back_menu)
 
 
 @router.message(F.text == "✏️ Изменить анонс")
 async def start_edit_announcement(message: types.Message, state: FSMContext):
     items = load_json(JSON_PATH)
     if not items:
-        return await message.answer("Список анонсов пуст.")
+        return await message.answer("Список анонсов пуст.", reply_markup=back_menu)
 
     keyboard = types.ReplyKeyboardMarkup(
         keyboard=[[types.KeyboardButton(text=item["title"])] for item in items]
@@ -166,14 +157,15 @@ async def ask_announcement_new_desc(message: types.Message, state: FSMContext):
 async def ask_announcement_new_media(message: types.Message, state: FSMContext):
     await state.update_data(desc=message.text.strip())
     await state.set_state(EditAnnouncement.waiting_for_new_media)
-    await message.answer("Отправьте новые медиафайлы или напишите 'Готово':")
+    await message.answer(
+        "Отправьте новые медиафайлы или напишите 'Готово':", reply_markup=back_menu
+    )
 
 
 @router.message(EditAnnouncement.waiting_for_new_media, F.text.lower() == "готово")
 async def save_edited_announcement(message: types.Message, state: FSMContext):
     data = await state.get_data()
     items = load_json(JSON_PATH)
-
     for item in items:
         if item["title"] == data["title"]:
             item["desc"] = data["desc"]
@@ -182,28 +174,20 @@ async def save_edited_announcement(message: types.Message, state: FSMContext):
 
     save_json(JSON_PATH, items)
     await state.clear()
-    await message.answer("✏️ Анонс обновлён.")
+    await message.answer("✏️ Анонс обновлён", reply_markup=back_menu)
 
 
 @router.message(
     EditAnnouncement.waiting_for_new_media, F.content_type.in_(["photo", "video"])
 )
 async def collect_announcement_new_media(message: types.Message, state: FSMContext):
-    media_list = []
-    if message.photo:
-        file_id = message.photo[-1].file_id
-        filename = await save_media_file(
-            message.bot, file_id, MEDIA_PATH, is_video=False
-        )
-        media_list.append(filename)
-    elif message.video:
-        file_id = message.video.file_id
-        filename = await save_media_file(
-            message.bot, file_id, MEDIA_PATH, is_video=True
-        )
-        media_list.append(filename)
+    file_id = message.photo[-1].file_id if message.photo else message.video.file_id
+    is_video = bool(message.video)
+    filename = await save_media_file(message.bot, file_id, MEDIA_PATH, is_video)
 
-    state_data = await state.get_data()
-    all_media = state_data.get("media", []) + media_list
-    await state.update_data(media=all_media)
+    data = await state.get_data()
+    media_list = data.get("media", [])
+    media_list.append(filename)
+    await state.update_data(media=media_list)
+
     await message.answer("📎 Медиа добавлено. Отправьте ещё или напишите 'Готово'")

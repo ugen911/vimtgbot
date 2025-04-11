@@ -5,6 +5,7 @@ import os
 from config import DATA_DIR, MEDIA_DIR, ADMINS
 from handlers.admin.base_crud import load_json, save_json, save_media_file
 from filters.is_admin import IsAdmin
+from keyboards.main_menu import back_menu  # ✅ Унифицированное меню "Назад"
 
 router = Router()
 router.message.filter(IsAdmin())
@@ -59,14 +60,14 @@ async def get_pedagogue_name(message: types.Message, state: FSMContext):
     role_key = "воспитатели" if "Воспитатели" in message.text else "преподаватели"
     await state.update_data(role=role_key)
     await state.set_state(EditPedagogue.waiting_for_name)
-    await message.answer("Введите имя педагога:")
+    await message.answer("Введите имя педагога:", reply_markup=back_menu)
 
 
 @router.message(EditPedagogue.waiting_for_name)
 async def get_pedagogue_description(message: types.Message, state: FSMContext):
     await state.update_data(name=message.text.strip())
     await state.set_state(EditPedagogue.waiting_for_description)
-    await message.answer("Введите описание педагога:")
+    await message.answer("Введите описание педагога:", reply_markup=back_menu)
 
 
 @router.message(EditPedagogue.waiting_for_description)
@@ -74,7 +75,8 @@ async def get_pedagogue_media(message: types.Message, state: FSMContext):
     await state.update_data(description=message.text.strip())
     await state.set_state(EditPedagogue.waiting_for_media)
     await message.answer(
-        "Отправьте медиафайлы (фото/видео), когда закончите — напишите 'Готово'"
+        "Отправьте медиафайлы (фото/видео), когда закончите — напишите 'Готово'",
+        reply_markup=back_menu,
     )
 
 
@@ -116,7 +118,7 @@ async def save_pedagogue(message: types.Message, state: FSMContext):
     save_json(JSON_PATH, all_data)
 
     await state.clear()
-    await message.answer("✅ Педагог добавлен")
+    await message.answer("✅ Педагог добавлен", reply_markup=back_menu)
 
 
 @router.message(F.text == "🗑 Удалить")
@@ -129,7 +131,8 @@ async def delete_pedagogue_start(message: types.Message, state: FSMContext):
                 [
                     types.KeyboardButton(text="👩‍🏫 Воспитатели"),
                     types.KeyboardButton(text="🎓 Преподаватели"),
-                ]
+                ],
+                [types.KeyboardButton(text="🔙 Назад")],
             ],
             resize_keyboard=True,
         ),
@@ -146,7 +149,8 @@ async def edit_pedagogue_start(message: types.Message, state: FSMContext):
                 [
                     types.KeyboardButton(text="👩‍🏫 Воспитатели"),
                     types.KeyboardButton(text="🎓 Преподаватели"),
-                ]
+                ],
+                [types.KeyboardButton(text="🔙 Назад")],
             ],
             resize_keyboard=True,
         ),
@@ -162,11 +166,12 @@ async def list_pedagogues_by_role(message: types.Message, state: FSMContext):
     names = [p["name"] for p in data.get(role_key, [])]
 
     if not names:
-        return await message.answer("Список пуст")
+        return await message.answer("Список пуст", reply_markup=back_menu)
 
     await state.update_data(role=role_key)
     keyboard = types.ReplyKeyboardMarkup(
-        keyboard=[[types.KeyboardButton(text=name)] for name in names],
+        keyboard=[[types.KeyboardButton(text=name)] for name in names]
+        + [[types.KeyboardButton(text="🔙 Назад")]],
         resize_keyboard=True,
     )
     await state.set_state(ManagePedagogue.choosing_name)
@@ -182,19 +187,19 @@ async def confirm_edit_or_delete(message: types.Message, state: FSMContext):
     index = next((i for i, p in enumerate(all_data[role]) if p["name"] == name), -1)
 
     if index == -1:
-        return await message.answer("❌ Не найдено")
+        return await message.answer("❌ Не найдено", reply_markup=back_menu)
 
     await state.update_data(name=name, index=index)
     if state.state == ManagePedagogue.choosing_name:
         await state.set_state(ManagePedagogue.editing_description)
-        await message.answer("Введите новое описание:")
+        await message.answer("Введите новое описание:", reply_markup=back_menu)
 
 
 @router.message(ManagePedagogue.editing_description)
 async def edit_description(message: types.Message, state: FSMContext):
     await state.update_data(description=message.text.strip())
     await state.set_state(ManagePedagogue.editing_media)
-    await message.answer("Отправьте новые медиа или 'Готово'")
+    await message.answer("Отправьте новые медиа или 'Готово'", reply_markup=back_menu)
 
 
 @router.message(ManagePedagogue.editing_media, F.content_type.in_(["photo", "video"]))
@@ -221,10 +226,10 @@ async def finish_editing(message: types.Message, state: FSMContext):
     role = data["role"]
     idx = data["index"]
     all_data[role][idx]["description"] = data["description"]
-    all_data[role]["media"] = data.get("media", [])
+    all_data[role][idx]["media"] = data.get("media", [])
 
     save_json(JSON_PATH, all_data)
-    await message.answer("✏️ Обновлено")
+    await message.answer("✏️ Обновлено", reply_markup=back_menu)
     await state.clear()
 
 
@@ -236,5 +241,5 @@ async def finish_delete(message: types.Message, state: FSMContext):
     idx = data["index"]
     del all_data[role][idx]
     save_json(JSON_PATH, all_data)
-    await message.answer("🗑 Удалено")
+    await message.answer("🗑 Удалено", reply_markup=back_menu)
     await state.clear()

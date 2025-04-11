@@ -15,3 +15,15 @@ main_menu = ReplyKeyboardMarkup(
 back_menu = ReplyKeyboardMarkup(
     keyboard=[[KeyboardButton(text="🔙 Назад")]], resize_keyboard=True
 )
+
+admin_main_menu = ReplyKeyboardMarkup(
+    keyboard=[
+        [KeyboardButton(text="📚 Услуги"), KeyboardButton(text="📰 Анонсы")],
+        [KeyboardButton(text="🍎 Меню"), KeyboardButton(text="📅 Расписание")],
+        [
+            KeyboardButton(text="🧑‍🏫 Педагоги"),
+            KeyboardButton(text="🌐 Онлайн экскурсия"),
+        ],
+    ],
+    resize_keyboard=True,
+)

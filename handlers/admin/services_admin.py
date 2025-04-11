@@ -5,6 +5,7 @@ import os
 from config import DATA_DIR, MEDIA_DIR, SECTIONS, ADMINS
 from handlers.admin.base_crud import load_json, save_json, save_media_file
 from filters.is_admin import IsAdmin
+from keyboards.main_menu import back_menu  # ✅ Добавили общий "Назад"
 
 router = Router()
 router.message.filter(IsAdmin())
@@ -53,14 +54,14 @@ async def admin_services_menu(message: types.Message):
 @router.message(F.text == "➕ Добавить услугу")
 async def start_add_service(message: types.Message, state: FSMContext):
     await state.set_state(AddService.waiting_for_title)
-    await message.answer("Введите заголовок новой услуги:")
+    await message.answer("Введите заголовок новой услуги:", reply_markup=back_menu)
 
 
 @router.message(AddService.waiting_for_title)
 async def process_service_title(message: types.Message, state: FSMContext):
     await state.update_data(title=message.text.strip())
     await state.set_state(AddService.waiting_for_desc)
-    await message.answer("Введите описание услуги:")
+    await message.answer("Введите описание услуги:", reply_markup=back_menu)
 
 
 @router.message(AddService.waiting_for_desc)
@@ -68,7 +69,8 @@ async def process_service_desc(message: types.Message, state: FSMContext):
     await state.update_data(desc=message.text.strip())
     await state.set_state(AddService.waiting_for_media)
     await message.answer(
-        "Отправьте медиафайлы (фото/видео). Когда закончите — напишите 'Готово'"
+        "Отправьте медиафайлы (фото/видео). Когда закончите — напишите 'Готово'",
+        reply_markup=back_menu,
     )
 
 
@@ -84,7 +86,7 @@ async def finish_add_service(message: types.Message, state: FSMContext):
     save_json(JSON_PATH, services)
 
     await state.clear()
-    await message.answer("✅ Услуга добавлена")
+    await message.answer("✅ Услуга добавлена", reply_markup=back_menu)
 
 
 @router.message(AddService.waiting_for_media, F.content_type.in_(["photo", "video"]))
@@ -113,7 +115,7 @@ async def collect_service_media(message: types.Message, state: FSMContext):
 async def start_delete_service(message: types.Message, state: FSMContext):
     services = load_json(JSON_PATH)
     if not services:
-        return await message.answer("Список услуг пуст.")
+        return await message.answer("Список услуг пуст.", reply_markup=back_menu)
 
     keyboard = types.ReplyKeyboardMarkup(
         keyboard=[[types.KeyboardButton(text=svc["title"])] for svc in services]
@@ -131,18 +133,18 @@ async def process_delete_selection(message: types.Message, state: FSMContext):
 
     new_services = [svc for svc in services if svc["title"] != title_to_delete]
     if len(new_services) == len(services):
-        return await message.answer("❌ Услуга не найдена.")
+        return await message.answer("❌ Услуга не найдена.", reply_markup=back_menu)
 
     save_json(JSON_PATH, new_services)
     await state.clear()
-    await message.answer("🗑 Услуга удалена.")
+    await message.answer("🗑 Услуга удалена.", reply_markup=back_menu)
 
 
 @router.message(F.text == "✏️ Изменить услугу")
 async def start_edit_service(message: types.Message, state: FSMContext):
     services = load_json(JSON_PATH)
     if not services:
-        return await message.answer("Список услуг пуст.")
+        return await message.answer("Список услуг пуст.", reply_markup=back_menu)
 
     keyboard = types.ReplyKeyboardMarkup(
         keyboard=[[types.KeyboardButton(text=svc["title"])] for svc in services]
@@ -157,14 +159,16 @@ async def start_edit_service(message: types.Message, state: FSMContext):
 async def ask_new_description(message: types.Message, state: FSMContext):
     await state.update_data(title=message.text.strip())
     await state.set_state(EditService.waiting_for_new_desc)
-    await message.answer("Введите новое описание:")
+    await message.answer("Введите новое описание:", reply_markup=back_menu)
 
 
 @router.message(EditService.waiting_for_new_desc)
 async def ask_new_media(message: types.Message, state: FSMContext):
     await state.update_data(desc=message.text.strip())
     await state.set_state(EditService.waiting_for_new_media)
-    await message.answer("Отправьте новые медиафайлы или напишите 'Готово':")
+    await message.answer(
+        "Отправьте новые медиафайлы или напишите 'Готово':", reply_markup=back_menu
+    )
 
 
 @router.message(EditService.waiting_for_new_media, F.text.lower() == "готово")
@@ -180,7 +184,7 @@ async def save_edited_service(message: types.Message, state: FSMContext):
 
     save_json(JSON_PATH, services)
     await state.clear()
-    await message.answer("✏️ Услуга обновлена.")
+    await message.answer("✏️ Услуга обновлена.", reply_markup=back_menu)
 
 
 @router.message(
