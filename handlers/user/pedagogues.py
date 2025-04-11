@@ -37,7 +37,7 @@ async def send_pedagogues_list(message: types.Message, role_key: str):
     if not items:
         return await message.answer("Список пуст.", reply_markup=back_menu)
 
-    media_folder = role_key  # автоматически: 'воспитатели' или 'преподаватели'
+    media_folder = role_key
 
     for index, item in enumerate(items):
         name = item.get("name", "Без имени")
@@ -48,25 +48,32 @@ async def send_pedagogues_list(message: types.Message, role_key: str):
         text = f"<b>{name}</b>\n<b>{role}</b>\n{description}"
         await message.answer(text, parse_mode="HTML", reply_markup=back_menu)
 
-        if media_list:
-            album = MediaGroupBuilder()
-            for file in media_list:
-                file_path = os.path.join("media", "педагоги", media_folder, file)
-                if not os.path.exists(file_path):
-                    await message.answer(f"❌ Файл не найден: {file}")
-                    continue
-                if file.endswith(".mp4"):
-                    album.add_document(FSInputFile(file_path))  # поддержка видео >50 МБ
-                else:
-                    album.add_photo(FSInputFile(file_path))
+        album = MediaGroupBuilder()
 
-            built_album = album.build()
-            if built_album:
-                try:
-                    await message.answer_media_group(built_album)
-                except Exception as e:
-                    await message.answer(f"⚠️ Ошибка при отправке медиа: {e}")
-        else:
+        for file in media_list:
+            file_path = os.path.join("media", "педагоги", media_folder, file)
+            if not os.path.exists(file_path):
+                await message.answer(f"❌ Файл не найден: {file}")
+                continue
+
+            if file.endswith(".mp4"):
+                file_size = os.path.getsize(file_path)
+                if file_size <= 49 * 1024 * 1024:
+                    album.add_video(FSInputFile(file_path))
+                else:
+                    await message.answer(
+                        f"⚠️ Видео слишком большое и не может быть отправлено (>50 МБ): {file}"
+                    )
+            else:
+                album.add_photo(FSInputFile(file_path))
+
+        built_album = album.build()
+        if built_album:
+            try:
+                await message.answer_media_group(built_album)
+            except Exception as e:
+                await message.answer(f"⚠️ Ошибка при отправке медиа: {e}")
+        elif not media_list:
             await message.answer("❌ Медиа не найдено.", reply_markup=back_menu)
 
 

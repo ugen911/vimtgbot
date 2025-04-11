@@ -1,13 +1,15 @@
 {
     "воспитатели": [
         {
-            "name": "Иван",
-            "role": "Трудовик",
-            "description": "Мужчина",
+            "name": "Петр",
+            "role": "Физио",
+            "description": "Классный",
             "media": [
                 "irina_photo.jpg",
                 "irina_video.mp4",
-                "dbef5ad7edfd4f96968ed09608e5a448.jpg"
+                "dbef5ad7edfd4f96968ed09608e5a448.jpg",
+                "960ff8750b9c457198eddcb3391645cc.mp4",
+                "1deededa3a124a33b0804b535ad9920f.mp4"
             ]
         },
         {
