@@ -3,22 +3,19 @@ import json
 from aiogram import Router, types, F
 from config import DATA_DIR, MEDIA_DIR, SECTIONS
 from keyboards.main_menu import back_menu
-from handlers.user.state import user_states
+from filters.admin_mode_filter import AdminModeFilter, NotAdminModeFilter
 
 router = Router()
 
 SECTION_TITLE = "📅 Расписание занятий"
-SECTION_KEY = SECTIONS.get(
-    SECTION_TITLE, "расписание"
-).strip()  # 👈 безопасное извлечение ключа
+SECTION_KEY = SECTIONS.get(SECTION_TITLE, "расписание").strip()
 JSON_PATH = os.path.join(DATA_DIR, f"{SECTION_KEY}.json")
 MEDIA_PATH = os.path.join(MEDIA_DIR, SECTION_KEY)
 
 
-@router.message(F.text == SECTION_TITLE)
+# Обработчик для обычных пользователей (когда не в админ-режиме)
+@router.message(NotAdminModeFilter(), F.text == SECTION_TITLE)
 async def choose_group(message: types.Message):
-    user_states.pop(message.from_user.id, None)  # 👈 сброс состояния формы
-
     keyboard = types.ReplyKeyboardMarkup(
         keyboard=[
             [types.KeyboardButton(text="👶 Младшая группа")],
@@ -30,7 +27,10 @@ async def choose_group(message: types.Message):
     await message.answer("Выберите группу:", reply_markup=keyboard)
 
 
-@router.message(F.text.in_(["👶 Младшая группа", "🧒 Старшая группа"]))
+# Обработчик для просмотра расписания
+@router.message(
+    NotAdminModeFilter(), F.text.in_(["👶 Младшая группа", "🧒 Старшая группа"])
+)
 async def show_schedule(message: types.Message):
     group_key = "младшая" if "Младшая" in message.text else "старшая"
 
@@ -48,11 +48,9 @@ async def show_schedule(message: types.Message):
         )
         return
 
-
-    for i, block in enumerate(blocks):
+    for block in blocks:
         desc = block.get("desc", "")
         media_list = block.get("media", [])
-
 
         if media_list:
             for media_file in media_list:
@@ -77,3 +75,10 @@ async def show_schedule(message: types.Message):
                     )
         else:
             await message.answer(desc, reply_markup=back_menu)
+
+
+# Обработчик для администраторов, перенаправляющий их в админский раздел
+@router.message(AdminModeFilter(), F.text == SECTION_TITLE)
+async def admin_schedule_redirect(message: types.Message):
+    await message.answer("Открываю управление расписанием...")
+    await message.bot.send_message(message.chat.id, "/admin_schedule")

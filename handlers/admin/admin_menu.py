@@ -1,6 +1,6 @@
 from aiogram import Router, F, types
 from config import ADMINS
-from utils.admin_mode import enable_admin, disable_admin, is_admin_mode
+from utils.admin_mode import enable_admin, disable_admin
 from filters.admin_mode_filter import AdminModeFilter
 
 router = Router()

@@ -1,10 +1,12 @@
 from aiogram import Router, types, F
 from keyboards.main_menu import main_menu, back_menu
+from filters.admin_mode_filter import NotAdminModeFilter
 
 router = Router()
 
 
-@router.message(F.text == "📞 Контакты")
+# Контакты (доступно только если пользователь не в админ-режиме)
+@router.message(NotAdminModeFilter(), F.text == "📞 Контакты")
 async def show_contacts(message: types.Message):
     contact_info = (
         "<b>📞 Контакты:</b>\n\n"
@@ -15,6 +17,7 @@ async def show_contacts(message: types.Message):
     await message.answer(contact_info, parse_mode="HTML", reply_markup=back_menu)
 
 
+# Главное меню
 @router.message(F.text == "📺 Главное меню")
 async def go_home(message: types.Message):
     await message.answer("🏡 Главное меню:", reply_markup=main_menu)

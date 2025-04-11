@@ -3,6 +3,7 @@ import json
 from aiogram import Router, types, F
 from config import DATA_DIR, MEDIA_DIR, SECTIONS
 from keyboards.main_menu import back_menu
+from filters.admin_mode_filter import NotAdminModeFilter
 
 router = Router()
 
@@ -12,9 +13,9 @@ JSON_PATH = os.path.join(DATA_DIR, f"{SECTION_KEY}.json")
 MEDIA_PATH = os.path.join(MEDIA_DIR, SECTION_KEY)
 
 
-@router.message(F.text == SECTION_TITLE)
+# Обработчик для обычных пользователей (когда они не в админ-режиме)
+@router.message(NotAdminModeFilter(), F.text == SECTION_TITLE)
 async def show_online_tour(message: types.Message):
-
     if not os.path.exists(JSON_PATH):
         await message.answer(
             "Онлайн-экскурсия пока недоступна.", reply_markup=back_menu
@@ -29,7 +30,6 @@ async def show_online_tour(message: types.Message):
             "⚠️ Неверный формат данных экскурсии.", reply_markup=back_menu
         )
         return
-
 
     for i, block in enumerate(blocks):
         desc = block.get("desc", "")
@@ -58,3 +58,10 @@ async def show_online_tour(message: types.Message):
                     )
         else:
             await message.answer(desc, reply_markup=back_menu)
+
+
+# Обработчик для администраторов
+@router.message(F.text == SECTION_TITLE)
+async def admin_online_tour_redirect(message: types.Message):
+    await message.answer("Открываю управление онлайн-экскурсиями...")
+    await message.bot.send_message(message.chat.id, "/admin_online")

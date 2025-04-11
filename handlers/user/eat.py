@@ -3,6 +3,7 @@ from aiogram.types import ReplyKeyboardMarkup, KeyboardButton
 import os
 import json
 from keyboards.main_menu import main_menu, back_menu
+from filters.admin_mode_filter import NotAdminModeFilter
 
 router = Router()
 
@@ -13,8 +14,8 @@ menu_keyboard = ReplyKeyboardMarkup(
 )
 
 
-# Обработчик кнопки "Меню"
-@router.message(F.text == "🍎 Меню")
+# Обработчик кнопки "Меню" для обычных пользователей (когда они не в админ-режиме)
+@router.message(NotAdminModeFilter(), F.text == "🍎 Меню")
 async def show_menu(message: types.Message):
     # Загружаем меню из JSON
     with open("data/menu.json", encoding="utf-8") as f:

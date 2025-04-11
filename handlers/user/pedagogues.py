@@ -3,9 +3,11 @@ import os
 import json
 from keyboards.main_menu import main_menu, back_menu
 from aiogram.types import ReplyKeyboardMarkup, KeyboardButton
+from filters.admin_mode_filter import NotAdminModeFilter
 
 router = Router()
 
+# Главное меню для раздела "Педагоги"
 pedagogues_menu = ReplyKeyboardMarkup(
     keyboard=[
         [KeyboardButton(text="👩‍🏫 Воспитатели")],
@@ -15,13 +17,15 @@ pedagogues_menu = ReplyKeyboardMarkup(
     resize_keyboard=True,
 )
 
-# Обработчик кнопки "Педагоги" — выводит меню выбора
-@router.message(F.text == "🧑‍🏫 Педагоги")
+
+# Обработчик кнопки "Педагоги" — выводит меню выбора для пользователей (когда не в админ-режиме)
+@router.message(NotAdminModeFilter(), F.text == "🧑‍🏫 Педагоги")
 async def show_pedagogues_menu(message: types.Message):
     await message.answer("Выберите раздел:", reply_markup=pedagogues_menu)
 
 
-@router.message(F.text == "👩‍🏫 Воспитатели")
+# Обработчик кнопки "Воспитатели" — выводит информацию для обычных пользователей (когда не в админ-режиме)
+@router.message(NotAdminModeFilter(), F.text == "👩‍🏫 Воспитатели")
 async def show_vospitately(message: types.Message):
     # Загружаем данные о воспитателях из JSON
     with open("data/pedagogues.json", encoding="utf-8") as f:
@@ -57,7 +61,8 @@ async def show_vospitately(message: types.Message):
                     )
 
 
-@router.message(F.text == "🎓 Преподаватели")
+# Обработчик кнопки "Преподаватели" — выводит информацию для обычных пользователей (когда не в админ-режиме)
+@router.message(NotAdminModeFilter(), F.text == "🎓 Преподаватели")
 async def show_prepodavateli(message: types.Message):
     # Загружаем данные о преподавателях из JSON
     with open("data/pedagogues.json", encoding="utf-8") as f:

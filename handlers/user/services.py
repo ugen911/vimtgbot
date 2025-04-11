@@ -4,6 +4,7 @@ from aiogram import Router, types, F
 from aiogram.utils.media_group import MediaGroupBuilder
 from config import DATA_DIR, MEDIA_DIR, SECTIONS
 from keyboards.main_menu import main_menu, back_menu
+from filters.admin_mode_filter import NotAdminModeFilter
 
 router = Router()
 
@@ -13,8 +14,8 @@ JSON_PATH = f"{DATA_DIR}/{SECTION_KEY}.json"
 MEDIA_PATH = f"{MEDIA_DIR}/{SECTION_KEY}"
 
 
-
-@router.message(F.text == SECTION_TITLE)
+# Обработчик кнопки "Услуги" для пользователей (когда не в админ-режиме)
+@router.message(NotAdminModeFilter(), F.text == SECTION_TITLE)
 async def show_services_menu(message: types.Message):
     if not os.path.exists(JSON_PATH):
         await message.answer("❌ Услуги не найдены.", reply_markup=back_menu)
@@ -38,6 +39,7 @@ async def show_services_menu(message: types.Message):
     await message.answer("Выберите услугу:", reply_markup=keyboard)
 
 
+# Обработчик для отображения детали услуги
 @router.message(
     F.text.in_(
         [
@@ -84,6 +86,8 @@ async def show_service_detail(message: types.Message):
     await message.answer(text, reply_markup=back_menu)
 
 
-@router.message(F.text.in_(["🔙 Назад", "🏠 Главное меню"]))
-async def go_back(message: types.Message):
-    await message.answer("🏡 Главное меню:", reply_markup=main_menu)
+# Обработчик для администраторов, перенаправляющий их в админский раздел
+@router.message(F.text == SECTION_TITLE)
+async def admin_services_redirect(message: types.Message):
+    await message.answer("Открываю управление услугами...")
+    await message.bot.send_message(message.chat.id, "/admin_services")
