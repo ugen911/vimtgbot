@@ -24,9 +24,7 @@ async def show_pedagogues_menu(message: types.Message):
     await message.answer("Выберите раздел:", reply_markup=pedagogues_menu)
 
 
-async def send_pedagogues_list(
-    message: types.Message, role_key: str, media_folder: str
-):
+async def send_pedagogues_list(message: types.Message, role_key: str):
     try:
         with open("data/pedagogues.json", encoding="utf-8") as f:
             data = json.load(f)
@@ -38,6 +36,8 @@ async def send_pedagogues_list(
     items = data.get(role_key, [])
     if not items:
         return await message.answer("Список пуст.", reply_markup=back_menu)
+
+    media_folder = role_key  # автоматически: 'воспитатели' или 'преподаватели'
 
     for index, item in enumerate(items):
         name = item.get("name", "Без имени")
@@ -51,12 +51,12 @@ async def send_pedagogues_list(
         if media_list:
             album = MediaGroupBuilder()
             for file in media_list:
-                file_path = os.path.join("media", media_folder, file)
+                file_path = os.path.join("media", "педагоги", media_folder, file)
                 if not os.path.exists(file_path):
                     await message.answer(f"❌ Файл не найден: {file}")
                     continue
                 if file.endswith(".mp4"):
-                    album.add_video(FSInputFile(file_path))
+                    album.add_document(FSInputFile(file_path))  # поддержка видео >50 МБ
                 else:
                     album.add_photo(FSInputFile(file_path))
 
@@ -72,16 +72,12 @@ async def send_pedagogues_list(
 
 @router.message(NotAdminModeFilter(), F.text == "👩‍🏫 Воспитатели")
 async def show_vospitately(message: types.Message):
-    await send_pedagogues_list(
-        message, role_key="воспитатели", media_folder="воспитатели"
-    )
+    await send_pedagogues_list(message, role_key="воспитатели")
 
 
 @router.message(NotAdminModeFilter(), F.text == "🎓 Преподаватели")
 async def show_prepodavateli(message: types.Message):
-    await send_pedagogues_list(
-        message, role_key="преподаватели", media_folder="преподаватели"
-    )
+    await send_pedagogues_list(message, role_key="преподаватели")
 
 
 @router.message(F.text == "🔙 Назад")
