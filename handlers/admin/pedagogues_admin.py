@@ -5,7 +5,7 @@ import os
 from config import DATA_DIR, MEDIA_DIR, ADMINS
 from handlers.admin.base_crud import load_json, save_json, save_media_file
 from filters.is_admin import IsAdmin
-from keyboards.main_menu import back_menu, action_menu
+from keyboards.main_menu import back_menu
 
 router = Router()
 router.message.filter(IsAdmin())
@@ -37,10 +37,8 @@ async def admin_pedagogues_menu(message: types.Message, state: FSMContext):
     await state.clear()
     keyboard = types.ReplyKeyboardMarkup(
         keyboard=[
-            [
-                types.KeyboardButton(text="👩‍🏫 Воспитатели"),
-                types.KeyboardButton(text="🎓 Преподаватели"),
-            ],
+            [types.KeyboardButton(text="👩‍🏫 Воспитатели")],
+            [types.KeyboardButton(text="🎓 Преподаватели")],
             [types.KeyboardButton(text="🔙 Назад")],
         ],
         resize_keyboard=True,
@@ -56,15 +54,23 @@ async def ask_action_for_role(message: types.Message, state: FSMContext):
     role = "воспитатели" if "Воспитатели" in message.text else "преподаватели"
     await state.update_data(role=role)
     await state.set_state(ManagePedagogue.choosing_action)
+
+    keyboard = types.ReplyKeyboardMarkup(
+        keyboard=[
+            [types.KeyboardButton(text="➕ Добавить педагога")],
+            [types.KeyboardButton(text="✏️ Изменить педагога")],
+            [types.KeyboardButton(text="🗑 Удалить педагога")],
+            [types.KeyboardButton(text="🔙 Назад")],
+        ],
+        resize_keyboard=True,
+    )
     await message.answer(
-        f"Вы выбрали {message.text}. Что хотите сделать?", reply_markup=action_menu
+        f"Вы выбрали {message.text}. Что хотите сделать?", reply_markup=keyboard
     )
 
 
-@router.message(ManagePedagogue.choosing_action, F.text == "➕ Добавить")
+@router.message(ManagePedagogue.choosing_action, F.text == "➕ Добавить педагога")
 async def start_add_pedagogue(message: types.Message, state: FSMContext):
-    if await state.get_state() != ManagePedagogue.choosing_action.state:
-        return
     await state.set_state(EditPedagogue.waiting_for_name)
     await message.answer("Введите имя педагога:", reply_markup=back_menu)
 
@@ -115,19 +121,15 @@ async def finish_add_pedagogue(message: types.Message, state: FSMContext):
         }
     )
     save_json(JSON_PATH, all_data)
-    await state.clear()
-    await message.answer("✅ Педагог добавлен", reply_markup=action_menu)
+    await state.set_state(ManagePedagogue.choosing_action)
+    await message.answer("✅ Педагог добавлен")
 
 
-@router.message(
-    ManagePedagogue.choosing_action, F.text.in_(["✏️ Изменить", "🗑 Удалить"])
-)
+@router.message(ManagePedagogue.choosing_action, F.text == "✏️ Изменить педагога")
+@router.message(ManagePedagogue.choosing_action, F.text == "🗑 Удалить педагога")
 async def choose_pedagogue_for_edit_or_delete(
     message: types.Message, state: FSMContext
 ):
-    if await state.get_state() != ManagePedagogue.choosing_action.state:
-        return
-
     action = message.text
     data = await state.get_data()
     role = data["role"]
@@ -137,7 +139,7 @@ async def choose_pedagogue_for_edit_or_delete(
     names = [p["name"] for p in all_data.get(role, [])]
 
     if not names:
-        return await message.answer("Список пуст.", reply_markup=action_menu)
+        return await message.answer("Список пуст.")
 
     keyboard = types.ReplyKeyboardMarkup(
         keyboard=[[types.KeyboardButton(text=name)] for name in names]
@@ -157,15 +159,15 @@ async def handle_pedagogue_action(message: types.Message, state: FSMContext):
     index = next((i for i, p in enumerate(all_data[role]) if p["name"] == name), -1)
 
     if index == -1:
-        return await message.answer("❌ Не найдено", reply_markup=action_menu)
+        return await message.answer("❌ Не найдено")
 
     await state.update_data(name=name, index=index)
 
-    if data["action"] == "🗑 Удалить":
+    if data["action"] == "🗑 Удалить педагога":
         del all_data[role][index]
         save_json(JSON_PATH, all_data)
-        await state.clear()
-        return await message.answer("🗑 Удалено", reply_markup=action_menu)
+        await state.set_state(ManagePedagogue.choosing_action)
+        return await message.answer("🗑 Удалено")
 
     await state.set_state(ManagePedagogue.editing_description)
     await message.answer("Введите новое описание:", reply_markup=back_menu)
@@ -200,5 +202,5 @@ async def finish_editing(message: types.Message, state: FSMContext):
     all_data[data["role"]][data["index"]]["description"] = data["description"]
     all_data[data["role"]][data["index"]]["media"] = data.get("media", [])
     save_json(JSON_PATH, all_data)
-    await state.clear()
-    await message.answer("✏️ Обновлено", reply_markup=action_menu)
+    await state.set_state(ManagePedagogue.choosing_action)
+    await message.answer("✏️ Обновлено")

@@ -5,7 +5,7 @@ import os
 from config import DATA_DIR, MEDIA_DIR, ADMINS
 from handlers.admin.base_crud import load_json, save_json, save_media_file
 from filters.is_admin import IsAdmin
-from keyboards.main_menu import back_menu, action_menu
+from keyboards.main_menu import back_menu
 
 router = Router()
 router.message.filter(IsAdmin())
@@ -28,15 +28,22 @@ class AddMenu(StatesGroup):
 async def menu_admin_menu(message: types.Message, state: FSMContext):
     if message.from_user.id not in ADMINS:
         return await message.answer("⛔ Доступ запрещен")
+
     await state.clear()
-    await message.answer("🍽 Управление меню:", reply_markup=action_menu)
+    keyboard = types.ReplyKeyboardMarkup(
+        keyboard=[
+            [types.KeyboardButton(text="➕ Добавить меню")],
+            [types.KeyboardButton(text="✏️ Изменить меню")],
+            [types.KeyboardButton(text="🗑 Удалить меню")],
+            [types.KeyboardButton(text="🔙 Назад")],
+        ],
+        resize_keyboard=True,
+    )
+    await message.answer("🍽 Управление меню:", reply_markup=keyboard)
 
 
-@router.message(F.text == "➕ Добавить")
+@router.message(F.text == "➕ Добавить меню")
 async def start_add_menu(message: types.Message, state: FSMContext):
-    current = await state.get_state()
-    if current not in [None]:
-        return
     await state.set_state(AddMenu.waiting_for_desc)
     await message.answer("Введите описание нового блока меню:", reply_markup=back_menu)
 
@@ -78,14 +85,11 @@ async def finish_add_menu(message: types.Message, state: FSMContext):
     save_json(JSON_PATH, menu)
 
     await state.clear()
-    await message.answer("✅ Блок меню добавлен", reply_markup=action_menu)
+    await message.answer("✅ Блок меню добавлен")
 
 
-@router.message(F.text == "✏️ Изменить")
+@router.message(F.text == "✏️ Изменить меню")
 async def edit_menu_desc(message: types.Message, state: FSMContext):
-    current = await state.get_state()
-    if current not in [None]:
-        return
     await state.set_state(EditMenu.waiting_for_desc)
     await message.answer(
         "Введите новое описание для первого блока меню:", reply_markup=back_menu
@@ -133,20 +137,15 @@ async def collect_menu_media(message: types.Message, state: FSMContext):
 @router.message(EditMenu.waiting_for_media, F.text.lower() == "готово")
 async def finish_edit_menu(message: types.Message, state: FSMContext):
     await state.clear()
-    await message.answer("✅ Меню обновлено", reply_markup=action_menu)
+    await message.answer("✅ Меню обновлено")
 
 
-@router.message(F.text == "🗑 Удалить")
+@router.message(F.text == "🗑 Удалить меню")
 async def clear_menu_media(message: types.Message, state: FSMContext):
-    current = await state.get_state()
-    if current not in [None]:
-        return
     data = load_json(JSON_PATH)
     if data.get("menu_items"):
         data["menu_items"][0]["media"] = []
         save_json(JSON_PATH, data)
-        await message.answer(
-            "🗑 Все медиафайлы из первого блока меню удалены", reply_markup=action_menu
-        )
+        await message.answer("🗑 Все медиафайлы из первого блока меню удалены")
     else:
-        await message.answer("Меню не найдено", reply_markup=action_menu)
+        await message.answer("Меню не найдено")
