@@ -1,4 +1,4 @@
-from aiogram import Router, F, types
+from aiogram import Router, F, types, Bot
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 import os
@@ -34,6 +34,20 @@ def is_permanent(admin_id_or_username: str) -> bool:
     return str(admin_id_or_username) in map(str, PERMANENT_ADMINS)
 
 
+async def notify_permanent_admins(bot: Bot, added_by: types.User, new_admin: str):
+    for admin_id in PERMANENT_ADMINS:
+        try:
+            await bot.send_message(
+                admin_id,
+                f"🆕 <b>Добавлен новый администратор:</b>\n"
+                f"👤 <code>{new_admin}</code>\n"
+                f"👮 Добавил: @{added_by.username or added_by.full_name}",
+                parse_mode="HTML",
+            )
+        except Exception as e:
+            print(f"[admin_manage] Не удалось уведомить {admin_id}: {e}")
+
+
 @router.message(F.text == "⚙️ Админы")
 async def show_admin_menu(message: types.Message, state: FSMContext):
     keyboard = types.ReplyKeyboardMarkup(
@@ -57,7 +71,7 @@ async def list_admins(message: types.Message):
     dynamic_admins = load_dynamic_admins()
     all_admins = list(
         dict.fromkeys([*PERMANENT_ADMINS, *dynamic_admins])
-    )  # remove duplicates, keep order
+    )  # remove duplicates
     text = "\n".join(
         f"• <code>{admin}</code>{' (постоянный)' if str(admin) in map(str, PERMANENT_ADMINS) else ''}"
         for admin in all_admins
@@ -87,6 +101,8 @@ async def handle_add_admin(message: types.Message, state: FSMContext):
     dynamic_admins = load_dynamic_admins()
     dynamic_admins.append(raw)
     save_dynamic_admins(dynamic_admins)
+
+    await notify_permanent_admins(message.bot, message.from_user, raw)
     await state.clear()
     await message.answer(
         f"✅ <code>{raw}</code> добавлен в администраторы.", parse_mode="HTML"
@@ -123,7 +139,7 @@ async def handle_remove_admin(message: types.Message, state: FSMContext):
     save_dynamic_admins(dynamic_admins)
     await state.clear()
     await message.answer(
-        f"🗑 <code>{raw}</code> удалён из списка администраторов.", parse_mode="HTML"
+        f"🗑 <code>{raw}</code> удалён из администраторов.", parse_mode="HTML"
     )
 
 
@@ -131,11 +147,13 @@ async def handle_remove_admin(message: types.Message, state: FSMContext):
 async def add_self_to_admins(message: types.Message):
     user_id = str(message.from_user.id)
     dynamic_admins = load_dynamic_admins()
+
     if user_id in dynamic_admins or user_id in map(str, PERMANENT_ADMINS):
         return await message.answer("⚠️ Вы уже в списке администраторов.")
 
     dynamic_admins.append(user_id)
     save_dynamic_admins(dynamic_admins)
+    await notify_permanent_admins(message.bot, message.from_user, user_id)
     await message.answer(
         f"✅ Вы добавлены как <code>{user_id}</code>", parse_mode="HTML"
     )
