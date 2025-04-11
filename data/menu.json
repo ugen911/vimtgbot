@@ -4,6 +4,15 @@
             "name": "Меню дня",
             "description": "Еда вкуснота",
             "media": []
+        },
+        {
+            "name": "Меню",
+            "description": "Питание вкусняха",
+            "media": [
+                "7fe2ff67401b4855b2c574966a513658.jpg",
+                "20f1a7b3a902433da2a00e1646e90a5d.jpg",
+                "d58597bd8e6f43d1ae13eb5b1e43f405.mp4"
+            ]
         }
     ]
 }

@@ -1,6 +1,8 @@
+from aiogram import Router, types, F
+from aiogram.types import FSInputFile
+from aiogram.utils.media_group import MediaGroupBuilder
 import os
 import json
-from aiogram import Router, types, F
 from config import DATA_DIR, MEDIA_DIR, SECTIONS
 from keyboards.main_menu import back_menu
 from filters.admin_mode_filter import NotAdminModeFilter
@@ -13,54 +15,42 @@ JSON_PATH = os.path.join(DATA_DIR, f"{SECTION_KEY}.json")
 MEDIA_PATH = os.path.join(MEDIA_DIR, SECTION_KEY)
 
 
-# Обработчик для обычных пользователей (когда они не в админ-режиме)
 @router.message(NotAdminModeFilter(), F.text == SECTION_TITLE)
 async def show_online_tour(message: types.Message):
     if not os.path.exists(JSON_PATH):
-        await message.answer(
+        return await message.answer(
             "Онлайн-экскурсия пока недоступна.", reply_markup=back_menu
         )
-        return
 
     with open(JSON_PATH, encoding="utf-8") as f:
         blocks = json.load(f)
 
-    if not isinstance(blocks, list):
-        await message.answer(
-            "⚠️ Неверный формат данных экскурсии.", reply_markup=back_menu
-        )
-        return
+    if not isinstance(blocks, list) or not blocks:
+        return await message.answer("Альбомы ещё не загружены.", reply_markup=back_menu)
 
     for i, block in enumerate(blocks):
         desc = block.get("desc", "")
-        media_list = block.get("media", [])
+        media_files = block.get("media", [])
 
-        if media_list:
-            for media_file in media_list:
-                file_path = os.path.join(MEDIA_PATH, media_file)
-                if os.path.exists(file_path):
-                    if media_file.endswith(".mp4"):
-                        await message.answer_video(
-                            types.FSInputFile(file_path),
-                            caption=desc,
-                            parse_mode="HTML",
-                        )
-                    else:
-                        await message.answer_photo(
-                            types.FSInputFile(file_path),
-                            caption=desc,
-                            parse_mode="HTML",
-                        )
+        if media_files:
+            album = MediaGroupBuilder()
+            for file in media_files:
+                file_path = os.path.join(MEDIA_PATH, file)
+                if not os.path.exists(file_path):
+                    continue
+                if file.endswith(".mp4"):
+                    album.add_video(FSInputFile(file_path))
                 else:
-                    await message.answer(
-                        f"❌ Видео будет доступно позже:\n\n{desc}",
-                        reply_markup=back_menu,
-                    )
-        else:
-            await message.answer(desc, reply_markup=back_menu)
+                    album.add_photo(FSInputFile(file_path))
+
+            try:
+                await message.answer_media_group(album.build())
+            except Exception as e:
+                await message.answer(f"⚠️ Ошибка при отправке альбома: {e}")
+
+        await message.answer(desc, parse_mode="HTML", reply_markup=back_menu)
 
 
-# Обработчик для администраторов
 @router.message(F.text == SECTION_TITLE)
 async def admin_online_tour_redirect(message: types.Message):
     await message.answer("Открываю управление онлайн-экскурсиями...")
