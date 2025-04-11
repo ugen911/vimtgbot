@@ -24,16 +24,7 @@ admin_main_menu = ReplyKeyboardMarkup(
             KeyboardButton(text="🧑‍🏫 Педагоги"),
             KeyboardButton(text="🌐 Онлайн экскурсия"),
         ],
-    ],
-    resize_keyboard=True,
-)
-
-action_menu = ReplyKeyboardMarkup(
-    keyboard=[
-        [KeyboardButton(text="➕ Добавить")],
-        [KeyboardButton(text="✏️ Изменить")],
-        [KeyboardButton(text="🗑 Удалить")],
-        [KeyboardButton(text="🔙 Назад")],
+        [KeyboardButton(text="⚙️ Админы")],
     ],
     resize_keyboard=True,
 )

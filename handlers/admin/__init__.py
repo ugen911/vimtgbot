@@ -7,6 +7,7 @@ from . import (
     schedule_admin,
     pedagogues_admin,
     online_tour_admin,
+    admin_manage,
 )
 
 
@@ -18,3 +19,4 @@ def register_admin_handlers(dp: Dispatcher):
     dp.include_router(schedule_admin.router)
     dp.include_router(pedagogues_admin.router)
     dp.include_router(online_tour_admin.router)
+    dp.include_router(admin_manage.router)
