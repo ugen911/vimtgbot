@@ -1,8 +1,9 @@
 from aiogram import Router, types, F
+from aiogram.types import FSInputFile, ReplyKeyboardMarkup, KeyboardButton
+from aiogram.utils.media_group import MediaGroupBuilder
 import os
 import json
 from keyboards.main_menu import main_menu, back_menu
-from aiogram.types import ReplyKeyboardMarkup, KeyboardButton
 from filters.admin_mode_filter import NotAdminModeFilter
 
 router = Router()
@@ -18,87 +19,71 @@ pedagogues_menu = ReplyKeyboardMarkup(
 )
 
 
-# Обработчик кнопки "Педагоги" — выводит меню выбора для пользователей (когда не в админ-режиме)
 @router.message(NotAdminModeFilter(), F.text == "🧑‍🏫 Педагоги")
 async def show_pedagogues_menu(message: types.Message):
     await message.answer("Выберите раздел:", reply_markup=pedagogues_menu)
 
 
-# Обработчик кнопки "Воспитатели" — выводит информацию для обычных пользователей (когда не в админ-режиме)
+async def send_pedagogues_list(
+    message: types.Message, role_key: str, media_folder: str
+):
+    try:
+        with open("data/pedagogues.json", encoding="utf-8") as f:
+            data = json.load(f)
+    except FileNotFoundError:
+        return await message.answer(
+            "❌ Данные о педагогах не найдены.", reply_markup=back_menu
+        )
+
+    items = data.get(role_key, [])
+    if not items:
+        return await message.answer("Список пуст.", reply_markup=back_menu)
+
+    for index, item in enumerate(items):
+        name = item.get("name", "Без имени")
+        role = item.get("role", "Роль не указана")
+        description = item.get("description", "Описание отсутствует")
+        media_list = item.get("media", [])
+
+        text = f"<b>{name}</b>\n<b>{role}</b>\n{description}"
+        await message.answer(text, parse_mode="HTML", reply_markup=back_menu)
+
+        if media_list:
+            album = MediaGroupBuilder()
+            for file in media_list:
+                file_path = os.path.join("media", media_folder, file)
+                if not os.path.exists(file_path):
+                    await message.answer(f"❌ Файл не найден: {file}")
+                    continue
+                if file.endswith(".mp4"):
+                    album.add_video(FSInputFile(file_path))
+                else:
+                    album.add_photo(FSInputFile(file_path))
+
+            built_album = album.build()
+            if built_album:
+                try:
+                    await message.answer_media_group(built_album)
+                except Exception as e:
+                    await message.answer(f"⚠️ Ошибка при отправке медиа: {e}")
+        else:
+            await message.answer("❌ Медиа не найдено.", reply_markup=back_menu)
+
+
 @router.message(NotAdminModeFilter(), F.text == "👩‍🏫 Воспитатели")
 async def show_vospitately(message: types.Message):
-    # Загружаем данные о воспитателях из JSON
-    with open("data/pedagogues.json", encoding="utf-8") as f:
-        data = json.load(f)
-
-    # Получаем информацию о воспитателях
-    vospitately = data.get("воспитатели", [])
-
-    # Формируем и отправляем сообщение для каждого воспитателя
-    for vospitately_info in vospitately:
-        name = vospitately_info["name"]
-        role = vospitately_info["role"]
-        description = vospitately_info["description"]
-        media_list = vospitately_info.get("media", [])
-
-        message_text = f"<b>{name}</b>\n{role}\n{description}"
-        await message.answer(message_text, parse_mode="HTML", reply_markup=back_menu)
-
-        # Отправляем медиа (фото и видео)
-        if not media_list:
-            await message.answer("❌ Медиа не найдено.", reply_markup=back_menu)
-        else:
-            for media_file in media_list:
-                file_path = os.path.join("media", "воспитатели", media_file)
-                if os.path.exists(file_path):
-                    if media_file.endswith(".mp4"):
-                        await message.answer_video(types.FSInputFile(file_path))
-                    else:
-                        await message.answer_photo(types.FSInputFile(file_path))
-                else:
-                    await message.answer(
-                        f"❌ Файл не найден: {media_file}", reply_markup=back_menu
-                    )
+    await send_pedagogues_list(
+        message, role_key="воспитатели", media_folder="воспитатели"
+    )
 
 
-# Обработчик кнопки "Преподаватели" — выводит информацию для обычных пользователей (когда не в админ-режиме)
 @router.message(NotAdminModeFilter(), F.text == "🎓 Преподаватели")
 async def show_prepodavateli(message: types.Message):
-    # Загружаем данные о преподавателях из JSON
-    with open("data/pedagogues.json", encoding="utf-8") as f:
-        data = json.load(f)
-
-    # Получаем информацию о преподавателях
-    prepodavateli = data.get("преподаватели", [])
-
-    # Формируем и отправляем сообщение для каждого преподавателя
-    for prepodavatel_info in prepodavateli:
-        name = prepodavatel_info["name"]
-        role = prepodavatel_info["role"]
-        description = prepodavatel_info["description"]
-        media_list = prepodavatel_info.get("media", [])
-
-        message_text = f"<b>{name}</b>\n{role}\n{description}"
-        await message.answer(message_text, parse_mode="HTML", reply_markup=back_menu)
-
-        # Отправляем медиа (фото и видео)
-        if not media_list:
-            await message.answer("❌ Медиа не найдено.", reply_markup=back_menu)
-        else:
-            for media_file in media_list:
-                file_path = os.path.join("media", "преподаватели", media_file)
-                if os.path.exists(file_path):
-                    if media_file.endswith(".mp4"):
-                        await message.answer_video(types.FSInputFile(file_path))
-                    else:
-                        await message.answer_photo(types.FSInputFile(file_path))
-                else:
-                    await message.answer(
-                        f"❌ Файл не найден: {media_file}", reply_markup=back_menu
-                    )
+    await send_pedagogues_list(
+        message, role_key="преподаватели", media_folder="преподаватели"
+    )
 
 
-# Кнопка "Назад" для возврата в главное меню
 @router.message(F.text == "🔙 Назад")
 async def go_back(message: types.Message):
     await message.answer("Вы вернулись в главное меню.", reply_markup=main_menu)
