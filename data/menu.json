@@ -2,11 +2,8 @@
     "menu_items": [
         {
             "name": "Меню дня",
-            "description": "Полезное меню с блюдами, подходящими для детей. Составляется индивидуально.",
-            "media": [
-                "menu_photo.jpg",
-                "menu_video.mp4"
-            ]
+            "description": "Еда вкуснота",
+            "media": []
         }
     ]
 }

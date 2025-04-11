@@ -1,7 +1,14 @@
 from aiogram import Router, types, F
-from aiogram.types import ReplyKeyboardMarkup, KeyboardButton
+from aiogram.types import (
+    ReplyKeyboardMarkup,
+    KeyboardButton,
+    FSInputFile,
+    InputMediaPhoto,
+    InputMediaVideo,
+)
 import os
 import json
+from aiogram.utils.media_group import MediaGroupBuilder
 from keyboards.main_menu import main_menu, back_menu
 from filters.admin_mode_filter import NotAdminModeFilter
 
@@ -17,45 +24,44 @@ menu_keyboard = ReplyKeyboardMarkup(
 # Обработчик кнопки "Меню" для обычных пользователей (когда они не в админ-режиме)
 @router.message(NotAdminModeFilter(), F.text == "🍎 Меню")
 async def show_menu(message: types.Message):
-    # Загружаем меню из JSON
-    with open("data/menu.json", encoding="utf-8") as f:
-        data = json.load(f)
+    try:
+        with open("data/menu.json", encoding="utf-8") as f:
+            data = json.load(f)
+    except FileNotFoundError:
+        return await message.answer("❌ Меню пока недоступно.", reply_markup=back_menu)
 
-    # Получаем список элементов меню
     menu_items = data.get("menu_items", [])
 
-    # Отправляем данные для каждого элемента меню
     for item in menu_items:
         name = item["name"]
         description = item["description"]
         media_list = item.get("media", [])
 
-        # Формируем текстовое описание
         message_text = f"<b>{name}</b>\n{description}"
         await message.answer(message_text, parse_mode="HTML", reply_markup=back_menu)
 
-        # Отправляем медиа (фото и видео)
-        if not media_list:
-            await message.answer("❌ Медиа не найдено.", reply_markup=back_menu)
-        else:
+        if media_list:
+            album = MediaGroupBuilder()
             for media_file in media_list:
                 file_path = os.path.join("media", "меню", media_file)
                 if os.path.exists(file_path):
                     if media_file.endswith(".mp4"):
-                        await message.answer_video(types.FSInputFile(file_path))
+                        album.add_video(FSInputFile(file_path))
                     else:
-                        await message.answer_photo(types.FSInputFile(file_path))
-                else:
-                    await message.answer(
-                        f"❌ Файл не найден: {media_file}", reply_markup=back_menu
-                    )
+                        album.add_photo(FSInputFile(file_path))
+            built_album = album.build()
+            if built_album:
+                await message.answer_media_group(built_album)
+            else:
+                await message.answer("⚠️ Медиафайлы не найдены.", reply_markup=back_menu)
+        else:
+            await message.answer("❌ Медиа не найдено.", reply_markup=back_menu)
 
 
 # Обработчик для приема фото и видео (когда пользователь отправляет вложения)
 @router.message(F.content_type.in_(["photo", "video"]))
 async def handle_media(message: types.Message):
     if message.photo:
-        # Получаем самое большое фото
         file_id = message.photo[-1].file_id
         file = await message.bot.get_file(file_id)
         file_path = file.file_path
