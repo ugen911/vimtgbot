@@ -19,7 +19,7 @@ async def choose_block_to_delete(message: types.Message, state: FSMContext):
     blocks = load_json(JSON_PATH).get(group, [])
 
     if not blocks:
-        return await message.answer("Список пуст")
+        return await message.answer("📭 Блоков расписания нет.")
 
     keyboard = types.ReplyKeyboardMarkup(
         keyboard=[
@@ -29,44 +29,59 @@ async def choose_block_to_delete(message: types.Message, state: FSMContext):
         + [[types.KeyboardButton(text="🔙 Назад")]],
         resize_keyboard=True,
     )
-    await state.set_state(ManageSchedule.choosing_block)
-    await state.update_data(action="delete")
-    await message.answer("Выберите блок для удаления:", reply_markup=keyboard)
+    await state.set_state(ManageSchedule.choosing_block_to_delete)
+    await message.answer(
+        "Выберите блок для удаления или '🔙 Назад':", reply_markup=keyboard
+    )
 
 
-@router.message(ManageSchedule.choosing_block, F.text.regexp(r"^\d+:"))
+@router.message(ManageSchedule.choosing_block_to_delete)
 async def process_block_deletion(message: types.Message, state: FSMContext):
-    index = int(message.text.split(":")[0]) - 1
+    text = message.text.strip()
     data = await state.get_data()
     group = data["group"]
+
+    if text.lower() in ["🔙 назад", "отмена"]:
+        await state.set_state(ManageSchedule.choosing_action)
+        return await message.answer(
+            "↩️ Возврат в меню действий.", reply_markup=back_menu
+        )
+
+    if not text or ":" not in text or not text.split(":")[0].isdigit():
+        return await message.answer("❌ Неверный формат. Выберите из списка.")
+
+    index = int(text.split(":")[0]) - 1
     schedule = load_json(JSON_PATH)
 
-    if 0 <= index < len(schedule[group]):
-        for file in schedule[group][index].get("media", []):
-            try:
-                os.remove(os.path.join(MEDIA_PATH, group, file))
-            except FileNotFoundError:
-                pass
-        del schedule[group][index]
-        save_json(JSON_PATH, schedule)
+    if not (0 <= index < len(schedule[group])):
+        return await message.answer("❌ Блок не найден. Попробуйте снова.")
 
-        # Повторный выбор, если ещё есть блоки
-        blocks = schedule.get(group, [])
-        if blocks:
-            keyboard = types.ReplyKeyboardMarkup(
-                keyboard=[
-                    [types.KeyboardButton(text=f"{i+1}: {b['desc'][:30]}")]
-                    for i, b in enumerate(blocks)
-                ]
-                + [[types.KeyboardButton(text="🔙 Назад")]],
-                resize_keyboard=True,
-            )
-            return await message.answer(
-                "🗑 Блок удалён. Выберите следующий или '🔙 Назад':",
-                reply_markup=keyboard,
-            )
+    # Удаление медиа
+    for file in schedule[group][index].get("media", []):
+        try:
+            os.remove(os.path.join(MEDIA_PATH, group, file))
+        except FileNotFoundError:
+            pass
+
+    del schedule[group][index]
+    save_json(JSON_PATH, schedule)
+
+    # Повторный выбор, если остались блоки
+    updated_blocks = schedule.get(group, [])
+    if updated_blocks:
+        keyboard = types.ReplyKeyboardMarkup(
+            keyboard=[
+                [types.KeyboardButton(text=f"{i+1}: {b['desc'][:30]}")]
+                for i, b in enumerate(updated_blocks)
+            ]
+            + [[types.KeyboardButton(text="🔙 Назад")]],
+            resize_keyboard=True,
+        )
+        await message.answer(
+            "🗑 Блок удалён. Выберите следующий для удаления или '🔙 Назад':",
+            reply_markup=keyboard,
+        )
+        return
 
     await state.set_state(ManageSchedule.choosing_action)
-    await message.answer(
-        "🗑 Блок удалён. Других блоков не осталось.", reply_markup=back_menu
-    )
+    await message.answer("🗑 Все блоки удалены. Возврат в меню.", reply_markup=back_menu)
