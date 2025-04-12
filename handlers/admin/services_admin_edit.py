@@ -188,7 +188,7 @@ async def delete_selected_media(message: types.Message, state: FSMContext):
         )
     else:
         await message.answer(
-            "Медиа больше не осталось. Перехожу к добавлению новых.",
+            "Медиа больше не осталось. Перехожу к добавлению новых. Или 'Готово' для сохранения без медиа",
             reply_markup=back_menu,
         )
         await state.set_state(EditService.adding_media)
