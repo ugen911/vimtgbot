@@ -3,7 +3,7 @@ import json
 from aiogram import Router, types, F
 from aiogram.utils.media_group import MediaGroupBuilder
 from config import DATA_DIR, MEDIA_DIR, SECTIONS
-from keyboards.main_menu import back_menu
+from keyboards.main_menu import back_menu, main_menu
 from filters.admin_mode_filter import AdminModeFilter, NotAdminModeFilter
 
 router = Router()
@@ -34,17 +34,15 @@ async def show_schedule(message: types.Message):
     group_key = "младшая" if "Младшая" in message.text else "старшая"
 
     if not os.path.exists(JSON_PATH):
-        await message.answer("Расписание пока недоступно.", reply_markup=back_menu)
+        await message.answer("🛠 Мы над этим работаем...", reply_markup=back_menu)
         return
 
     with open(JSON_PATH, encoding="utf-8") as f:
         data = json.load(f)
 
     blocks = data.get(group_key, [])
-    if not isinstance(blocks, list):
-        await message.answer(
-            "⚠️ Неверный формат данных расписания.", reply_markup=back_menu
-        )
+    if not isinstance(blocks, list) or not blocks:
+        await message.answer("🛠 Мы над этим работаем...", reply_markup=back_menu)
         return
 
     for block in blocks:
@@ -52,6 +50,8 @@ async def show_schedule(message: types.Message):
         media_list = block.get("media", [])
 
         album = MediaGroupBuilder()
+        send_as_album = True
+
         for media_file in media_list:
             file_path = os.path.join(MEDIA_PATH, group_key, media_file)
             if not os.path.exists(file_path):
@@ -62,26 +62,42 @@ async def show_schedule(message: types.Message):
                 if file_size <= 49 * 1024 * 1024:
                     album.add_video(types.FSInputFile(file_path))
                 else:
-                    await message.answer(
-                        f"⚠️ Видео слишком большое (>50 МБ): {media_file}"
-                    )
+                    send_as_album = False
+                    break
             else:
                 album.add_photo(types.FSInputFile(file_path))
 
         built_album = album.build()
-        if built_album:
+        if send_as_album and built_album:
             try:
                 await message.answer_media_group(built_album)
             except Exception as e:
                 await message.answer(f"⚠️ Ошибка при отправке медиа: {e}")
+        else:
+            for media_file in media_list:
+                file_path = os.path.join(MEDIA_PATH, group_key, media_file)
+                if not os.path.exists(file_path):
+                    continue
+                if media_file.endswith(".mp4"):
+                    await message.answer_video(types.FSInputFile(file_path))
+                else:
+                    await message.answer_photo(types.FSInputFile(file_path))
 
         if desc:
             await message.answer(desc, reply_markup=back_menu)
-
-        await message.answer("────────────", reply_markup=back_menu)
 
 
 @router.message(AdminModeFilter(), F.text == SECTION_TITLE)
 async def admin_schedule_redirect(message: types.Message):
     await message.answer("Открываю управление расписанием...")
     await message.bot.send_message(message.chat.id, "/admin_schedule")
+
+
+@router.message(F.text == "🔙 Назад")
+async def go_back(message: types.Message):
+    await message.answer("Вы вернулись в главное меню.", reply_markup=main_menu)
+
+
+@router.message(F.text == "🏠 Главное меню")
+async def go_home(message: types.Message):
+    await message.answer("🏠 Главное меню:", reply_markup=main_menu)

@@ -30,12 +30,14 @@ async def send_pedagogues_list(message: types.Message, role_key: str):
             data = json.load(f)
     except FileNotFoundError:
         return await message.answer(
-            "❌ Данные о педагогах не найдены.", reply_markup=back_menu
+            "🔧 Мы над этим работаем...", reply_markup=back_menu
         )
 
     items = data.get(role_key, [])
     if not items:
-        return await message.answer("Список пуст.", reply_markup=back_menu)
+        return await message.answer(
+            "🔧 Мы над этим работаем...", reply_markup=back_menu
+        )
 
     media_folder = role_key
 
@@ -45,7 +47,6 @@ async def send_pedagogues_list(message: types.Message, role_key: str):
         description = item.get("description", "Описание отсутствует")
         media_list = item.get("media", [])
 
-        # 1. Сначала медиа (альбом)
         album = MediaGroupBuilder()
         for file in media_list:
             file_path = os.path.join("media", "педагоги", media_folder, file)
@@ -69,12 +70,8 @@ async def send_pedagogues_list(message: types.Message, role_key: str):
             except Exception as e:
                 await message.answer(f"⚠️ Ошибка при отправке медиа: {e}")
 
-        # 2. Затем текст
         text = f"<b>{name}</b>\n<b>{role}</b>\n{description}"
-        await message.answer(text, parse_mode="HTML")
-
-        # 3. Разделитель
-        await message.answer("──────────────", reply_markup=back_menu)
+        await message.answer(text, parse_mode="HTML", reply_markup=back_menu)
 
 
 @router.message(NotAdminModeFilter(), F.text == "👩‍🏫 Воспитатели")
@@ -90,3 +87,9 @@ async def show_prepodavateli(message: types.Message):
 @router.message(F.text == "🔙 Назад")
 async def go_back(message: types.Message):
     await message.answer("Вы вернулись в главное меню.", reply_markup=main_menu)
+
+
+@router.message(F.text == "🌟 Главное меню")
+@router.message(F.text == "🌟 Главное меню")
+async def go_home(message: types.Message):
+    await message.answer("🏠 Главное меню:", reply_markup=main_menu)

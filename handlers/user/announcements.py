@@ -17,15 +17,13 @@ MEDIA_PATH = f"{MEDIA_DIR}/{SECTION_KEY}"
 @router.message(NotAdminModeFilter(), F.text == SECTION_TITLE)
 async def show_announcements(message: types.Message):
     if not os.path.exists(JSON_PATH):
-        return await message.answer("Пока нет анонсов.", reply_markup=back_menu)
+        return await message.answer("🛠 Мы над этим работаем...", reply_markup=back_menu)
 
     with open(JSON_PATH, encoding="utf-8") as f:
         items = json.load(f)
 
     if not items:
-        return await message.answer(
-            "Анонсы пока не опубликованы.", reply_markup=back_menu
-        )
+        return await message.answer("🛠 Мы над этим работаем...", reply_markup=back_menu)
 
     for item in items:
         title = item.get("title", "Без заголовка")
@@ -42,7 +40,13 @@ async def show_announcements(message: types.Message):
                     continue
 
                 if filename.endswith(".mp4"):
-                    album.add_video(types.FSInputFile(full_path))
+                    file_size = os.path.getsize(full_path)
+                    if file_size <= 49 * 1024 * 1024:
+                        album.add_video(types.FSInputFile(full_path))
+                    else:
+                        await message.answer(
+                            f"⚠️ Видео слишком большое (>50 МБ): {filename}"
+                        )
                 else:
                     album.add_photo(types.FSInputFile(full_path))
 
@@ -58,3 +62,13 @@ async def show_announcements(message: types.Message):
 async def admin_announcements_redirect(message: types.Message):
     await message.answer("Открываю управление анонсами...")
     await message.bot.send_message(message.chat.id, "/admin_announcements")
+
+
+@router.message(F.text == "🔙 Назад")
+async def go_back(message: types.Message):
+    await message.answer("Вы вернулись в главное меню.", reply_markup=main_menu)
+
+
+@router.message(F.text == "🏠 Главное меню")
+async def go_home(message: types.Message):
+    await message.answer("🏠 Главное меню:", reply_markup=main_menu)
