@@ -160,4 +160,10 @@ async def save_edited_schedule(message: types.Message, state: FSMContext):
 
     save_json(JSON_PATH, schedule)
     await state.set_state(ManageSchedule.choosing_action)
-    await message.answer("✏️ Блок расписания обновлён")
+    await message.answer(
+        "✏️ Блок расписания обновлён",
+        reply_markup=types.ReplyKeyboardMarkup(
+            keyboard=[[types.KeyboardButton(text="🔙 Назад")]],
+            resize_keyboard=True,
+        ),
+    )
