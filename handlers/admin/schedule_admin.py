@@ -9,6 +9,7 @@ from .schedule_admin_states import ManageSchedule
 # Импорт вспомогательных модулей
 from .schedule_admin_add import router as add_router
 from .schedule_admin_edit import router as edit_router
+from .schedule_admin_delete import router as delete_router  # ← новый импорт
 
 router = Router()
 router.message.filter(IsAdmin())
@@ -16,6 +17,7 @@ router.message.filter(IsAdmin())
 # Подключаем вспомогательные роутеры
 router.include_router(add_router)
 router.include_router(edit_router)
+router.include_router(delete_router)  # ← подключение delete-модуля
 
 
 @router.message(F.text == "/admin_schedule")

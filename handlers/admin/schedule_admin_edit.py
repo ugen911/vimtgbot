@@ -12,20 +12,15 @@ JSON_PATH = os.path.join(DATA_DIR, "расписание.json")
 MEDIA_PATH = os.path.join(MEDIA_DIR, "расписание")
 
 
-@router.message(
-    ManageSchedule.choosing_action,
-    F.text.in_(["✏️ Изменить расписание", "🗑 Удалить расписание"]),
-)
-async def choose_block_to_edit_or_delete(message: types.Message, state: FSMContext):
+@router.message(ManageSchedule.choosing_action, F.text == "✏️ Изменить расписание")
+async def choose_block_to_edit(message: types.Message, state: FSMContext):
     data = await state.get_data()
     group = data["group"]
-    action = message.text
     blocks = load_json(JSON_PATH).get(group, [])
 
     if not blocks:
         return await message.answer("Список пуст")
 
-    await state.update_data(action=action)
     keyboard = types.ReplyKeyboardMarkup(
         keyboard=[
             [types.KeyboardButton(text=f"{i+1}: {b['desc'][:30]}")]
@@ -34,28 +29,17 @@ async def choose_block_to_edit_or_delete(message: types.Message, state: FSMConte
         + [[types.KeyboardButton(text="🔙 Назад")]],
         resize_keyboard=True,
     )
+    await state.update_data(action="edit")
     await state.set_state(ManageSchedule.choosing_block)
-    await message.answer("Выберите блок:", reply_markup=keyboard)
+    await message.answer("Выберите блок для редактирования:", reply_markup=keyboard)
 
 
 @router.message(ManageSchedule.choosing_block, F.text.regexp(r"^\d+:"))
-async def process_block_selection(message: types.Message, state: FSMContext):
+async def process_edit_selection(message: types.Message, state: FSMContext):
     index = int(message.text.split(":")[0]) - 1
     data = await state.get_data()
     group = data["group"]
     schedule = load_json(JSON_PATH)
-
-    if data["action"] == "🗑 Удалить расписание":
-        if 0 <= index < len(schedule[group]):
-            for file in schedule[group][index].get("media", []):
-                try:
-                    os.remove(os.path.join(MEDIA_PATH, group, file))
-                except FileNotFoundError:
-                    pass
-            del schedule[group][index]
-            save_json(JSON_PATH, schedule)
-            await state.set_state(ManageSchedule.choosing_action)
-            return await message.answer("🗑 Блок удалён")
 
     await state.update_data(block_idx=index, media=[])
     await state.set_state(ManageSchedule.editing_desc)
@@ -92,9 +76,7 @@ async def save_edited_schedule(message: types.Message, state: FSMContext):
     idx = data["block_idx"]
     schedule = load_json(JSON_PATH)
 
-    # Удаляем старые медиа
-    old_media = schedule[group][idx].get("media", [])
-    for file in old_media:
+    for file in schedule[group][idx].get("media", []):
         try:
             os.remove(os.path.join(MEDIA_PATH, group, file))
         except FileNotFoundError:
