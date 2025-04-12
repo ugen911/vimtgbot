@@ -1,25 +1,22 @@
-from aiogram import Router, types, F
+from aiogram import Router, F, types
 from aiogram.fsm.context import FSMContext
-import os
-from config import DATA_DIR, MEDIA_DIR, ADMINS
-from filters.is_admin import IsAdmin
+from config import ADMINS
 from keyboards.main_menu import back_menu
+from filters.is_admin import IsAdmin
+from .pedagogues_admin_states import ManagePedagogue, EditPedagogue
 
-from .pedagogues_admin_states import EditPedagogue, ManagePedagogue
-
-# Импорт роутеров из вспомогательных модулей
+# Подроутеры
 from .pedagogues_admin_add import router as add_router
 from .pedagogues_admin_edit import router as edit_router
+from .pedagogues_admin_delete import router as delete_router
 
 router = Router()
 router.message.filter(IsAdmin())
 
-# Подключаем вспомогательные роутеры
+# Подключаем все подмодули
 router.include_router(add_router)
 router.include_router(edit_router)
-
-JSON_PATH = os.path.join(DATA_DIR, "pedagogues.json")
-MEDIA_PATH = os.path.join(MEDIA_DIR, "педагоги")
+router.include_router(delete_router)
 
 
 @router.message(F.text == "/admin_pedagogues")
@@ -31,20 +28,20 @@ async def admin_pedagogues_menu(message: types.Message, state: FSMContext):
     keyboard = types.ReplyKeyboardMarkup(
         keyboard=[
             [types.KeyboardButton(text="👩‍🏫 Воспитатели")],
-            [types.KeyboardButton(text="🎓 Преподаватели")],
+            [types.KeyboardButton(text="🎨 Специалисты")],
             [types.KeyboardButton(text="🔙 Назад")],
         ],
         resize_keyboard=True,
     )
-    await message.answer("Выберите категорию:", reply_markup=keyboard)
+    await message.answer("👥 Выберите категорию педагогов:", reply_markup=keyboard)
     await state.set_state(ManagePedagogue.choosing_role)
 
 
 @router.message(
-    ManagePedagogue.choosing_role, F.text.in_(["👩‍🏫 Воспитатели", "🎓 Преподаватели"])
+    ManagePedagogue.choosing_role, F.text.in_(["👩‍🏫 Воспитатели", "🎨 Специалисты"])
 )
-async def ask_action_for_role(message: types.Message, state: FSMContext):
-    role = "воспитатели" if "Воспитатели" in message.text else "преподаватели"
+async def handle_role_selection(message: types.Message, state: FSMContext):
+    role = "воспитатели" if "Воспитатели" in message.text else "специалисты"
     await state.update_data(role=role)
     await state.set_state(ManagePedagogue.choosing_action)
 
@@ -58,6 +55,13 @@ async def ask_action_for_role(message: types.Message, state: FSMContext):
         resize_keyboard=True,
     )
     await message.answer(
-        f"Вы выбрали {message.text}. Что хотите сделать?",
-        reply_markup=keyboard,
+        f"Вы выбрали: {message.text}. Что хотите сделать?", reply_markup=keyboard
+    )
+
+
+@router.message(ManagePedagogue.choosing_action, F.text == "➕ Добавить педагога")
+async def start_add_pedagogue(message: types.Message, state: FSMContext):
+    await state.set_state(EditPedagogue.waiting_for_name)
+    await message.answer(
+        "Введите имя педагога или напишите 'Пропустить':", reply_markup=back_menu
     )
