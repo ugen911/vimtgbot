@@ -28,7 +28,7 @@ async def admin_pedagogues_menu(message: types.Message, state: FSMContext):
     keyboard = types.ReplyKeyboardMarkup(
         keyboard=[
             [types.KeyboardButton(text="👩‍🏫 Воспитатели")],
-            [types.KeyboardButton(text="🎨 Специалисты")],
+            [types.KeyboardButton(text="🎨 Преподаватели")],
             [types.KeyboardButton(text="🔙 Назад")],
         ],
         resize_keyboard=True,
@@ -38,10 +38,10 @@ async def admin_pedagogues_menu(message: types.Message, state: FSMContext):
 
 
 @router.message(
-    ManagePedagogue.choosing_role, F.text.in_(["👩‍🏫 Воспитатели", "🎨 Специалисты"])
+    ManagePedagogue.choosing_role, F.text.in_(["👩‍🏫 Воспитатели", "🎨 Преподаватели"])
 )
 async def handle_role_selection(message: types.Message, state: FSMContext):
-    role = "воспитатели" if "Воспитатели" in message.text else "специалисты"
+    role = "воспитатели" if "Воспитатели" in message.text else "преподаватели"
     await state.update_data(role=role)
     await state.set_state(ManagePedagogue.choosing_action)
 
