@@ -1,6 +1,7 @@
 import os
 import json
 from aiogram import Router, types, F
+from aiogram.utils.media_group import MediaGroupBuilder
 from config import DATA_DIR, MEDIA_DIR, SECTIONS
 from keyboards.main_menu import back_menu
 from filters.admin_mode_filter import AdminModeFilter, NotAdminModeFilter
@@ -13,7 +14,6 @@ JSON_PATH = os.path.join(DATA_DIR, f"{SECTION_KEY}.json")
 MEDIA_PATH = os.path.join(MEDIA_DIR, SECTION_KEY)
 
 
-# Обработчик для обычных пользователей (когда не в админ-режиме)
 @router.message(NotAdminModeFilter(), F.text == SECTION_TITLE)
 async def choose_group(message: types.Message):
     keyboard = types.ReplyKeyboardMarkup(
@@ -27,7 +27,6 @@ async def choose_group(message: types.Message):
     await message.answer("Выберите группу:", reply_markup=keyboard)
 
 
-# Обработчик для просмотра расписания
 @router.message(
     NotAdminModeFilter(), F.text.in_(["👶 Младшая группа", "🧒 Старшая группа"])
 )
@@ -52,32 +51,36 @@ async def show_schedule(message: types.Message):
         desc = block.get("desc", "")
         media_list = block.get("media", [])
 
-        if media_list:
-            for media_file in media_list:
-                file_path = os.path.join(MEDIA_PATH, group_key, media_file)
-                if os.path.exists(file_path):
-                    if media_file.endswith(".mp4"):
-                        await message.answer_video(
-                            types.FSInputFile(file_path),
-                            caption=desc,
-                            parse_mode="HTML",
-                        )
-                    else:
-                        await message.answer_photo(
-                            types.FSInputFile(file_path),
-                            caption=desc,
-                            parse_mode="HTML",
-                        )
+        album = MediaGroupBuilder()
+        for media_file in media_list:
+            file_path = os.path.join(MEDIA_PATH, group_key, media_file)
+            if not os.path.exists(file_path):
+                await message.answer(f"❌ Файл не найден: {media_file}")
+                continue
+            if media_file.endswith(".mp4"):
+                file_size = os.path.getsize(file_path)
+                if file_size <= 49 * 1024 * 1024:
+                    album.add_video(types.FSInputFile(file_path))
                 else:
                     await message.answer(
-                        f"❌ Файл не найден: {media_file}\n{desc}",
-                        reply_markup=back_menu,
+                        f"⚠️ Видео слишком большое (>50 МБ): {media_file}"
                     )
-        else:
+            else:
+                album.add_photo(types.FSInputFile(file_path))
+
+        built_album = album.build()
+        if built_album:
+            try:
+                await message.answer_media_group(built_album)
+            except Exception as e:
+                await message.answer(f"⚠️ Ошибка при отправке медиа: {e}")
+
+        if desc:
             await message.answer(desc, reply_markup=back_menu)
 
+        await message.answer("────────────", reply_markup=back_menu)
 
-# Обработчик для администраторов, перенаправляющий их в админский раздел
+
 @router.message(AdminModeFilter(), F.text == SECTION_TITLE)
 async def admin_schedule_redirect(message: types.Message):
     await message.answer("Открываю управление расписанием...")

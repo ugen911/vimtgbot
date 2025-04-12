@@ -3,7 +3,7 @@ import json
 from aiogram import Router, types, F
 from aiogram.utils.media_group import MediaGroupBuilder
 from config import DATA_DIR, MEDIA_DIR, SECTIONS
-from keyboards.main_menu import main_menu, back_menu
+from keyboards.main_menu import back_menu
 from filters.admin_mode_filter import NotAdminModeFilter
 
 router = Router()
@@ -14,7 +14,6 @@ JSON_PATH = f"{DATA_DIR}/{SECTION_KEY}.json"
 MEDIA_PATH = f"{MEDIA_DIR}/{SECTION_KEY}"
 
 
-# Обработчик кнопки "Услуги" для пользователей (когда не в админ-режиме)
 @router.message(NotAdminModeFilter(), F.text == SECTION_TITLE)
 async def show_services_menu(message: types.Message):
     if not os.path.exists(JSON_PATH):
@@ -28,34 +27,25 @@ async def show_services_menu(message: types.Message):
         await message.answer("Список услуг пока пуст.", reply_markup=back_menu)
         return
 
-    # Формируем клавиатуру динамически
     buttons = [[types.KeyboardButton(text=item["title"])] for item in items]
-    buttons += [
-        [types.KeyboardButton(text="🔙 Назад")],
-        [types.KeyboardButton(text="🏠 Главное меню")],
-    ]
+    buttons += [[types.KeyboardButton(text="🔙 Назад")]]
     keyboard = types.ReplyKeyboardMarkup(keyboard=buttons, resize_keyboard=True)
 
     await message.answer("Выберите услугу:", reply_markup=keyboard)
 
 
-# Обработчик для отображения детали услуги
 @router.message(
+    NotAdminModeFilter(),
     F.text.in_(
         [
             item["title"]
-            for item in json.load(
-                open(JSON_PATH, encoding="utf-8")
-            )  # список всех названий услуг
+            for item in json.load(open(JSON_PATH, encoding="utf-8"))
             if isinstance(item, dict) and "title" in item
         ]
-    )
+    ),
 )
 async def show_service_detail(message: types.Message):
     service_name = message.text.strip()
-    if not os.path.exists(JSON_PATH):
-        await message.answer("❌ Услуги не найдены.", reply_markup=back_menu)
-        return
 
     with open(JSON_PATH, encoding="utf-8") as f:
         items = json.load(f)
@@ -63,31 +53,32 @@ async def show_service_detail(message: types.Message):
     service = next((item for item in items if item["title"] == service_name), None)
 
     if not service:
-        await message.answer("⚠️ Информация пока недоступна.", reply_markup=back_menu)
-        return
+        return await message.answer("⚠️ Информация об услуге не найдена.")
 
-    text = f"<b>{service['title']}</b>\n{service['desc']}"
+    desc = service.get("desc", "")
     media_files = service.get("media", [])
 
-    if media_files:
-        album = MediaGroupBuilder()
-        for filename in media_files:
-            full_path = os.path.join(MEDIA_PATH, filename)
-            if filename.endswith(".mp4"):
-                album.add_video(
-                    types.InputMediaVideo(media=types.FSInputFile(full_path))
-                )
+    album = MediaGroupBuilder()
+    for filename in media_files:
+        file_path = os.path.join(MEDIA_PATH, filename)
+        if not os.path.exists(file_path):
+            await message.answer(f"❌ Файл не найден: {filename}")
+            continue
+
+        if filename.endswith(".mp4"):
+            file_size = os.path.getsize(file_path)
+            if file_size <= 49 * 1024 * 1024:
+                album.add_video(types.FSInputFile(file_path))
             else:
-                album.add_photo(
-                    types.InputMediaPhoto(media=types.FSInputFile(full_path))
-                )
-        await message.answer_media_group(album.build())
+                await message.answer(f"⚠️ Видео слишком большое (>50 МБ): {filename}")
+        else:
+            album.add_photo(types.FSInputFile(file_path))
 
-    await message.answer(text, reply_markup=back_menu)
+    if built_album := album.build():
+        try:
+            await message.answer_media_group(built_album)
+        except Exception as e:
+            await message.answer(f"⚠️ Ошибка при отправке медиа: {e}")
 
-
-# Обработчик для администраторов, перенаправляющий их в админский раздел
-@router.message(F.text == SECTION_TITLE)
-async def admin_services_redirect(message: types.Message):
-    await message.answer("Открываю управление услугами...")
-    await message.bot.send_message(message.chat.id, "/admin_services")
+    text = f"<b>{service['title']}</b>\n{desc}"
+    await message.answer(text, parse_mode="HTML", reply_markup=back_menu)
