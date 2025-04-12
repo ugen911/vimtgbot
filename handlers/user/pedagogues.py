@@ -39,17 +39,14 @@ async def send_pedagogues_list(message: types.Message, role_key: str):
 
     media_folder = role_key
 
-    for index, item in enumerate(items):
+    for item in items:
         name = item.get("name", "Без имени")
         role = item.get("role", "Роль не указана")
         description = item.get("description", "Описание отсутствует")
         media_list = item.get("media", [])
 
-        text = f"<b>{name}</b>\n<b>{role}</b>\n{description}"
-        await message.answer(text, parse_mode="HTML", reply_markup=back_menu)
-
+        # 1. Сначала медиа (альбом)
         album = MediaGroupBuilder()
-
         for file in media_list:
             file_path = os.path.join("media", "педагоги", media_folder, file)
             if not os.path.exists(file_path):
@@ -61,9 +58,7 @@ async def send_pedagogues_list(message: types.Message, role_key: str):
                 if file_size <= 49 * 1024 * 1024:
                     album.add_video(FSInputFile(file_path))
                 else:
-                    await message.answer(
-                        f"⚠️ Видео слишком большое и не может быть отправлено (>50 МБ): {file}"
-                    )
+                    await message.answer(f"⚠️ Видео слишком большое (>50 МБ): {file}")
             else:
                 album.add_photo(FSInputFile(file_path))
 
@@ -73,8 +68,13 @@ async def send_pedagogues_list(message: types.Message, role_key: str):
                 await message.answer_media_group(built_album)
             except Exception as e:
                 await message.answer(f"⚠️ Ошибка при отправке медиа: {e}")
-        elif not media_list:
-            await message.answer("❌ Медиа не найдено.", reply_markup=back_menu)
+
+        # 2. Затем текст
+        text = f"<b>{name}</b>\n<b>{role}</b>\n{description}"
+        await message.answer(text, parse_mode="HTML")
+
+        # 3. Разделитель
+        await message.answer("──────────────", reply_markup=back_menu)
 
 
 @router.message(NotAdminModeFilter(), F.text == "👩‍🏫 Воспитатели")
