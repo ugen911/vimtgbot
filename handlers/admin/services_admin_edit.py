@@ -4,7 +4,7 @@ import os
 from config import DATA_DIR, MEDIA_DIR, SECTIONS
 from handlers.admin.base_crud import load_json, save_json, save_media_file
 from keyboards.main_menu import back_menu
-from .services_admin_states import EditService, ManageService, DeleteService
+from .services_admin_states import EditService, ManageService
 
 router = Router()
 
@@ -27,59 +27,6 @@ async def start_edit_service(message: types.Message, state: FSMContext):
     )
     await state.set_state(EditService.waiting_for_choice)
     await message.answer("Выберите услугу для редактирования:", reply_markup=keyboard)
-
-
-@router.message(ManageService.choosing_action, F.text == "🗑 Удалить услугу")
-async def start_delete_service(message: types.Message, state: FSMContext):
-    services = load_json(JSON_PATH)
-    if not services:
-        return await message.answer("Список услуг пуст.")
-
-    keyboard = types.ReplyKeyboardMarkup(
-        keyboard=[[types.KeyboardButton(text=item["title"])] for item in services]
-        + [[types.KeyboardButton(text="🔙 Назад")]],
-        resize_keyboard=True,
-    )
-    await state.set_state(DeleteService.waiting_for_selection)
-    await message.answer("Выберите услугу для удаления:", reply_markup=keyboard)
-
-
-@router.message(DeleteService.waiting_for_selection)
-async def delete_service_by_title(message: types.Message, state: FSMContext):
-    title = message.text.strip()
-    services = load_json(JSON_PATH)
-    new_services = []
-    found = False
-
-    for svc in services:
-        if svc["title"] == title:
-            for file in svc.get("media", []):
-                try:
-                    os.remove(os.path.join(MEDIA_PATH, file))
-                except FileNotFoundError:
-                    pass
-            found = True
-        else:
-            new_services.append(svc)
-
-    if not found:
-        return await message.answer("❌ Услуга не найдена")
-
-    save_json(JSON_PATH, new_services)
-    await message.answer("🗑 Услуга удалена")
-
-    # Предложим удалить ещё одну
-    services = new_services
-    if not services:
-        await state.set_state(ManageService.choosing_action)
-        return await message.answer("Список услуг теперь пуст.", reply_markup=back_menu)
-
-    keyboard = types.ReplyKeyboardMarkup(
-        keyboard=[[types.KeyboardButton(text=item["title"])] for item in services]
-        + [[types.KeyboardButton(text="🔙 Назад")]],
-        resize_keyboard=True,
-    )
-    await message.answer("Хотите удалить ещё одну? Выберите:", reply_markup=keyboard)
 
 
 @router.message(EditService.waiting_for_choice)
@@ -111,7 +58,6 @@ async def process_new_description(message: types.Message, state: FSMContext):
             "Нет медиа. Отправьте новые или 'Готово'", reply_markup=back_menu
         )
 
-    # Превью медиа
     for idx, file in enumerate(media, 1):
         full_path = os.path.join(MEDIA_PATH, file)
         if os.path.exists(full_path):
@@ -169,7 +115,6 @@ async def delete_selected_media(message: types.Message, state: FSMContext):
 
     await state.update_data(media=new_media)
 
-    # Повторно показать список для новой итерации
     if new_media:
         for idx, file in enumerate(new_media, 1):
             full_path = os.path.join(MEDIA_PATH, file)
