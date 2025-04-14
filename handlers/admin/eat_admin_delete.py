@@ -14,11 +14,25 @@ JSON_PATH = os.path.join(DATA_DIR, f"{SECTION_KEY}.json")
 MEDIA_PATH = os.path.join(MEDIA_DIR, SECTION_KEY)
 
 
+def delete_media_files(filenames: list[str]):
+    deleted = 0
+    for file in filenames:
+        path = os.path.join(MEDIA_PATH, file)
+        if os.path.exists(path):
+            try:
+                os.remove(path)
+                deleted += 1
+            except Exception as e:
+                print(f"[ERROR] Не удалось удалить {path}: {e}")
+        else:
+            print(f"[WARNING] Файл не найден: {path}")
+    print(f"[INFO] Удалено файлов: {deleted}")
+
+
 @router.message(ManageMenu.choosing_action, F.text == "🗑 Удалить меню")
 async def start_delete_menu(message: types.Message, state: FSMContext):
     data = load_json(JSON_PATH)
 
-    # 🛡️ Защита
     if isinstance(data, list):
         data = {"menu_items": data}
     elif not isinstance(data, dict):
@@ -46,7 +60,6 @@ async def delete_menu_block(message: types.Message, state: FSMContext):
 
     data = load_json(JSON_PATH)
 
-    # 🛡️ Защита
     if isinstance(data, list):
         data = {"menu_items": data}
     elif not isinstance(data, dict):
@@ -58,11 +71,7 @@ async def delete_menu_block(message: types.Message, state: FSMContext):
 
     for block in blocks:
         if block["description"] == desc:
-            for file in block.get("media", []):
-                try:
-                    os.remove(os.path.join(MEDIA_PATH, file))
-                except FileNotFoundError:
-                    pass
+            delete_media_files(block.get("media", []))
             found = True
         else:
             new_blocks.append(block)

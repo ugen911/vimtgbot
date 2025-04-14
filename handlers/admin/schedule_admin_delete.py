@@ -9,7 +9,23 @@ from .schedule_admin_states import ManageSchedule
 router = Router()
 
 JSON_PATH = os.path.join(DATA_DIR, "расписание.json")
-MEDIA_PATH = os.path.join(MEDIA_DIR, "расписание")
+MEDIA_ROOT = os.path.join(MEDIA_DIR, "расписание")
+
+
+def delete_media_files(filenames: list[str], group: str):
+    media_path = os.path.join(MEDIA_ROOT, group)
+    deleted = 0
+    for file in filenames:
+        path = os.path.join(media_path, file)
+        if os.path.exists(path):
+            try:
+                os.remove(path)
+                deleted += 1
+            except Exception as e:
+                print(f"[ERROR] Ошибка при удалении {path}: {e}")
+        else:
+            print(f"[WARNING] Файл не найден: {path}")
+    print(f"[INFO] Удалено файлов: {deleted} (группа: {group})")
 
 
 @router.message(ManageSchedule.choosing_action, F.text == "🗑 Удалить расписание")
@@ -56,17 +72,10 @@ async def process_block_deletion(message: types.Message, state: FSMContext):
     if not (0 <= index < len(schedule[group])):
         return await message.answer("❌ Блок не найден. Попробуйте снова.")
 
-    # Удаление медиа
-    for file in schedule[group][index].get("media", []):
-        try:
-            os.remove(os.path.join(MEDIA_PATH, group, file))
-        except FileNotFoundError:
-            pass
-
+    delete_media_files(schedule[group][index].get("media", []), group)
     del schedule[group][index]
     save_json(JSON_PATH, schedule)
 
-    # Повторный выбор, если остались блоки
     updated_blocks = schedule.get(group, [])
     if updated_blocks:
         keyboard = types.ReplyKeyboardMarkup(

@@ -14,6 +14,21 @@ JSON_PATH = os.path.join(DATA_DIR, f"{SECTION_KEY}.json")
 MEDIA_PATH = os.path.join(MEDIA_DIR, SECTION_KEY)
 
 
+def delete_media_files(filenames: list[str]):
+    deleted = 0
+    for file in filenames:
+        path = os.path.join(MEDIA_PATH, file)
+        if os.path.exists(path):
+            try:
+                os.remove(path)
+                deleted += 1
+            except Exception as e:
+                print(f"[ERROR] Ошибка при удалении {path}: {e}")
+        else:
+            print(f"[WARNING] Файл не найден: {path}")
+    print(f"[INFO] Удалено файлов: {deleted}")
+
+
 @router.message(ManageAnnouncements.choosing_action, F.text == "🗑 Удалить анонс")
 async def start_delete(message: types.Message, state: FSMContext):
     items = load_json(JSON_PATH)
@@ -43,11 +58,7 @@ async def delete_announcement(message: types.Message, state: FSMContext):
     found = False
     for item in items:
         if item["title"] == title:
-            for file in item.get("media", []):
-                try:
-                    os.remove(os.path.join(MEDIA_PATH, file))
-                except FileNotFoundError:
-                    pass
+            delete_media_files(item.get("media", []))
             found = True
         else:
             new_items.append(item)
@@ -59,7 +70,6 @@ async def delete_announcement(message: types.Message, state: FSMContext):
 
     save_json(JSON_PATH, new_items)
 
-    # Обновляем список
     items = new_items
     if not items:
         await state.set_state(ManageAnnouncements.choosing_action)

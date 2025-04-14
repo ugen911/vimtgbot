@@ -1,67 +1,87 @@
 from aiogram import Router, F, types
 from aiogram.fsm.context import FSMContext
-from config import ADMINS
+import os
+from config import DATA_DIR, MEDIA_DIR
+from handlers.admin.base_crud import load_json, save_json
 from keyboards.main_menu import back_menu
-from filters.is_admin import IsAdmin
-from .pedagogues_admin_states import ManagePedagogue, EditPedagogue
-
-# Подроутеры
-from .pedagogues_admin_add import router as add_router
-from .pedagogues_admin_edit import router as edit_router
-from .pedagogues_admin_delete import router as delete_router
+from .pedagogues_admin_states import ManagePedagogue
 
 router = Router()
-router.message.filter(IsAdmin())
 
-# Подключаем все подмодули
-router.include_router(add_router)
-router.include_router(edit_router)
-router.include_router(delete_router)
+JSON_PATH = os.path.join(DATA_DIR, "pedagogues.json")
+MEDIA_ROOT = os.path.join(MEDIA_DIR, "педагоги")
 
 
-@router.message(F.text == "/admin_pedagogues")
-async def admin_pedagogues_menu(message: types.Message, state: FSMContext):
-    if message.from_user.id not in ADMINS:
-        return await message.answer("⛔ Доступ запрещен")
+def delete_media_files(filenames: list[str], role: str):
+    media_path = os.path.join(MEDIA_ROOT, role)
+    deleted = 0
+    for file in filenames:
+        path = os.path.join(media_path, file)
+        if os.path.exists(path):
+            try:
+                os.remove(path)
+                deleted += 1
+            except Exception as e:
+                print(f"[ERROR] Ошибка при удалении {path}: {e}")
+        else:
+            print(f"[WARNING] Файл не найден: {path}")
+    print(f"[INFO] Удалено файлов: {deleted} (роль: {role})")
 
-    await state.clear()
+
+@router.message(ManagePedagogue.choosing_action, F.text == "🗑 Удалить педагога")
+async def choose_pedagogue_for_delete(message: types.Message, state: FSMContext):
+    data = await state.get_data()
+    role = data.get("role")
+    all_data = load_json(JSON_PATH)
+    items = all_data.get(role, [])
+
+    if not items:
+        return await message.answer("📭 Список педагогов пуст.")
+
     keyboard = types.ReplyKeyboardMarkup(
-        keyboard=[
-            [types.KeyboardButton(text="👩‍🏫 Воспитатели")],
-            [types.KeyboardButton(text="🎨 Преподаватели")],
-            [types.KeyboardButton(text="🔙 Назад")],
-        ],
+        keyboard=[[types.KeyboardButton(text=item["name"])] for item in items]
+        + [[types.KeyboardButton(text="🔙 Назад")]],
         resize_keyboard=True,
     )
-    await message.answer("👥 Выберите категорию педагогов:", reply_markup=keyboard)
-    await state.set_state(ManagePedagogue.choosing_role)
+    await state.set_state(ManagePedagogue.deleting_name)
+    await message.answer(
+        "Выберите педагога для удаления или '🔙 Назад':", reply_markup=keyboard
+    )
 
 
-@router.message(
-    ManagePedagogue.choosing_role, F.text.in_(["👩‍🏫 Воспитатели", "🎨 Преподаватели"])
-)
-async def handle_role_selection(message: types.Message, state: FSMContext):
-    role = "воспитатели" if "Воспитатели" in message.text else "преподаватели"
-    await state.update_data(role=role)
-    await state.set_state(ManagePedagogue.choosing_action)
+@router.message(ManagePedagogue.deleting_name)
+async def delete_pedagogue(message: types.Message, state: FSMContext):
+    name = message.text.strip()
+    if name.lower() in ["🔙 назад", "отмена"]:
+        await state.set_state(ManagePedagogue.choosing_action)
+        return await message.answer("↩️ Возврат в меню.", reply_markup=back_menu)
+
+    data = await state.get_data()
+    role = data.get("role")
+    all_data = load_json(JSON_PATH)
+    items = all_data.get(role, [])
+
+    index = next((i for i, p in enumerate(items) if p["name"] == name), -1)
+
+    if index == -1:
+        return await message.answer("❌ Педагог не найден. Выберите из списка.")
+
+    delete_media_files(items[index].get("media", []), role)
+    del all_data[role][index]
+    save_json(JSON_PATH, all_data)
+
+    remaining = all_data.get(role, [])
+    if not remaining:
+        await state.set_state(ManagePedagogue.choosing_action)
+        return await message.answer(
+            "🗑 Педагог удалён. Список пуст.", reply_markup=back_menu
+        )
 
     keyboard = types.ReplyKeyboardMarkup(
-        keyboard=[
-            [types.KeyboardButton(text="➕ Добавить педагога")],
-            [types.KeyboardButton(text="✏️ Изменить педагога")],
-            [types.KeyboardButton(text="🗑 Удалить педагога")],
-            [types.KeyboardButton(text="🔙 Назад")],
-        ],
+        keyboard=[[types.KeyboardButton(text=item["name"])] for item in remaining]
+        + [[types.KeyboardButton(text="🔙 Назад")]],
         resize_keyboard=True,
     )
     await message.answer(
-        f"Вы выбрали: {message.text}. Что хотите сделать?", reply_markup=keyboard
-    )
-
-
-@router.message(ManagePedagogue.choosing_action, F.text == "➕ Добавить педагога")
-async def start_add_pedagogue(message: types.Message, state: FSMContext):
-    await state.set_state(EditPedagogue.waiting_for_name)
-    await message.answer(
-        "Введите имя педагога или напишите 'Пропустить':", reply_markup=back_menu
+        "🗑 Педагог удалён. Выберите следующего или '🔙 Назад':", reply_markup=keyboard
     )

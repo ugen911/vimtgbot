@@ -15,6 +15,21 @@ JSON_PATH = os.path.join(DATA_DIR, f"{SECTION_KEY}.json")
 MEDIA_PATH = os.path.join(MEDIA_DIR, SECTION_KEY)
 
 
+def delete_media_files(filenames: list[str]):
+    deleted = 0
+    for file in filenames:
+        path = os.path.join(MEDIA_PATH, file)
+        if os.path.exists(path):
+            try:
+                os.remove(path)
+                deleted += 1
+            except Exception as e:
+                print(f"[ERROR] Ошибка при удалении {path}: {e}")
+        else:
+            print(f"[WARNING] Файл не найден: {path}")
+    print(f"[INFO] Удалено файлов: {deleted}")
+
+
 @router.message(ManageTour.choosing_action, F.text == "🗑 Удалить экскурсию")
 async def start_delete_tour(message: types.Message, state: FSMContext):
     blocks = load_json(JSON_PATH)
@@ -41,12 +56,7 @@ async def delete_selected_tour(message: types.Message, state: FSMContext):
     if not (0 <= idx < len(blocks)):
         return await message.answer("❌ Неверный выбор.")
 
-    for file in blocks[idx].get("media", []):
-        try:
-            os.remove(os.path.join(MEDIA_PATH, file))
-        except FileNotFoundError:
-            pass
-
+    delete_media_files(blocks[idx].get("media", []))
     del blocks[idx]
     save_json(JSON_PATH, blocks)
 
