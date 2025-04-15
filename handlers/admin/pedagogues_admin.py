@@ -5,7 +5,7 @@ from config import DATA_DIR, MEDIA_DIR, ADMINS
 from handlers.admin.base_crud import load_json, save_json
 from keyboards.main_menu import back_menu
 from filters.is_admin import IsAdmin
-from .pedagogues_admin_states import ManagePedagogue
+from .pedagogues_admin_states import ManagePedagogue, EditPedagogue
 
 JSON_PATH = os.path.join(DATA_DIR, "pedagogues.json")
 MEDIA_ROOT = os.path.join(MEDIA_DIR, "педагоги")
@@ -56,6 +56,16 @@ async def set_pedagogue_role(message: types.Message, state: FSMContext):
     )
     await message.answer("Выберите действие:", reply_markup=keyboard)
     await state.set_state(ManagePedagogue.choosing_action)
+
+
+# Новый обработчик для кнопки "➕ Добавить педагога"
+@router.message(ManagePedagogue.choosing_action, F.text == "➕ Добавить педагога")
+async def admin_add_pedagogue(message: types.Message, state: FSMContext):
+    # Переход в состояние добавления педагога. Значение "role" (категория) уже сохранено.
+    await state.set_state(EditPedagogue.waiting_for_name)
+    await message.answer(
+        "Введите имя педагога или напишите 'Пропустить':", reply_markup=back_menu
+    )
 
 
 def delete_media_files(filenames: list[str], role: str):
