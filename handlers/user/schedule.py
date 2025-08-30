@@ -19,6 +19,7 @@ async def choose_group(message: types.Message):
     keyboard = types.ReplyKeyboardMarkup(
         keyboard=[
             [types.KeyboardButton(text="👶 Младшая группа")],
+            [types.KeyboardButton(text="🧑 Средняя группа")],
             [types.KeyboardButton(text="🧒 Старшая группа")],
             [types.KeyboardButton(text="🔙 Назад")],
         ],
@@ -28,10 +29,16 @@ async def choose_group(message: types.Message):
 
 
 @router.message(
-    NotAdminModeFilter(), F.text.in_(["👶 Младшая группа", "🧒 Старшая группа"])
+    NotAdminModeFilter(),
+    F.text.in_(["👶 Младшая группа", "🧑 Средняя группа", "🧒 Старшая группа"]),
 )
 async def show_schedule(message: types.Message):
-    group_key = "младшая" if "Младшая" in message.text else "старшая"
+    if "Младшая" in message.text:
+        group_key = "младшая"
+    elif "Средняя" in message.text:
+        group_key = "средняя"
+    else:
+        group_key = "старшая"
 
     if not os.path.exists(JSON_PATH):
         await message.answer("🛠 Мы над этим работаем...", reply_markup=back_menu)

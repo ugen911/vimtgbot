@@ -29,6 +29,7 @@ async def schedule_admin_menu(message: types.Message, state: FSMContext):
     keyboard = types.ReplyKeyboardMarkup(
         keyboard=[
             [types.KeyboardButton(text="👶 Младшая группа")],
+            [types.KeyboardButton(text="🧑 Средняя группа")],
             [types.KeyboardButton(text="🧒 Старшая группа")],
             [types.KeyboardButton(text="🔙 Назад")],
         ],
@@ -40,10 +41,16 @@ async def schedule_admin_menu(message: types.Message, state: FSMContext):
 
 @router.message(
     ManageSchedule.choosing_group,
-    F.text.in_(["👶 Младшая группа", "🧒 Старшая группа"]),
+    F.text.in_(["👶 Младшая группа", "🧑 Средняя группа", "🧒 Старшая группа"]),
 )
 async def schedule_group_selected(message: types.Message, state: FSMContext):
-    group = "младшая" if "Младшая" in message.text else "старшая"
+    if "Младшая" in message.text:
+        group = "младшая"
+    elif "Средняя" in message.text:
+        group = "средняя"  
+    else:
+        group = "старшая"
+
     await state.update_data(group=group)
     await state.set_state(ManageSchedule.choosing_action)
 
